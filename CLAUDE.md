@@ -54,6 +54,6 @@ No unstructured text in API responses. Long-running operations return a pollable
 
 Invoke with `/skill-name`. See `.claude/skills/README.md` for details.
 
-- `/rust-guide` — Rust coding conventions (error handling, types, async, quality)
-- `/tdd-guide` — TDD workflow (Red → Green → Refactor)
-- `/submit` — Quality checks, commit, PR creation
+Development: `/rust-guide`, `/tdd-guide`, `/submit`
+Issues: `/create-issue`, `/analyze`
+Automation: `/spawn-worker`

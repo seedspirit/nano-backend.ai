@@ -10,13 +10,24 @@ Post-implementation submission pipeline: quality enforcement, learning notes, co
 
 ## Parameters
 
+- **issue** (optional): GitHub issue number (e.g., `#12` or `12`). Auto-detected from branch name if pattern `issue-\d+` exists.
 - **base_branch** (optional): Target branch for PR. Defaults to `main`.
 
 ## Workflow
 
 ### Phase 1: Pre-flight
 
-1. **Review changes**
+1. **Detect issue number**
+   - Check if user provided `issue`
+   - Otherwise extract from branch name (pattern: `issue-(\d+)`)
+   - If not found, ask user (allow "none" for no linked issue)
+
+2. **Fetch issue details** (if issue found)
+   ```bash
+   gh issue view <number> --json title,body,labels
+   ```
+
+3. **Review changes**
    - `git status` — see changed/untracked files
    - `git diff` and `git diff --staged` — review content
    - `git log {base_branch}..HEAD` — existing commits on branch
@@ -111,6 +122,35 @@ Date: YYYY-MM-DD
    ```
 
 2. **Create PR**
+
+   If a linked issue exists, the PR body must include the issue context and how it was resolved:
+
+   ```bash
+   gh pr create --title "type(scope): description" --body "$(cat <<'EOF'
+   ## Issue
+
+   Resolves #<number>
+
+   **Problem**: <1-2 sentence summary of the issue>
+
+   ## Solution
+
+   <How the issue was resolved — approach taken, key changes>
+
+   ## Summary
+   <1-3 bullet points of what changed>
+
+   ## What I learned
+   <1-2 sentences linking to the learning doc>
+
+   ## Test plan
+   - [ ] <test items>
+   EOF
+   )"
+   ```
+
+   If no linked issue:
+
    ```bash
    gh pr create --title "type(scope): description" --body "$(cat <<'EOF'
    ## Summary
