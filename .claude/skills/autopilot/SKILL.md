@@ -66,9 +66,28 @@ For each task:
 
 **Completion signal**: All plan tasks checked off, tests green.
 
-### Phase 5: Self-Review → reference `/rust-guide`
+### Phase 5: Test Verification + Self-Review → reference `/rust-guide`
 
-Invoke `Skill("rust-guide")` to load conventions, then review all changes:
+Invoke `Skill("rust-guide")` to load conventions, then:
+
+#### 5a. Test Coverage Check
+
+1. List all tests in changed crates. For each public function or endpoint, confirm:
+   - **Success scenario** exists (valid input → expected output)
+   - **Error/edge scenario** exists (invalid input, boundary → expected error)
+
+2. Report coverage:
+   ```
+   ## Test Coverage Report
+   ### <crate>::<module>
+   - ✅ success: <description>
+   - ✅ error: <description>
+   - ❌ missing: <what's not tested>
+   ```
+
+3. Write any missing tests before proceeding.
+
+#### 5b. Code Review
 
 1. `git diff main..HEAD` — read every changed file
 2. Verify against checklist:
@@ -78,7 +97,7 @@ Invoke `Skill("rust-guide")` to load conventions, then review all changes:
 | No `.unwrap()` / `.expect()` in prod | CLAUDE.md |
 | `tracing` only, no `println!` | CLAUDE.md |
 | External endpoints return `ApiResponse` | CLAUDE.md |
-| Every public fn has a test | CLAUDE.md |
+| Every public fn has success + error tests | CLAUDE.md |
 | `thiserror::Error` for error types | /rust-guide |
 | Descriptive naming | /rust-guide |
 | Minimal `pub` boundaries | /rust-guide |
