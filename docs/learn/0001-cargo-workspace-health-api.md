@@ -11,6 +11,28 @@ Date: 2026-03-14
 
 ## Concepts learned
 
+### Rust 기초 용어
+
+- **Crate (크레이트)**: Rust의 컴파일 단위이자 패키지. Python의 패키지, Java의 jar와 비슷한 개념.
+  - **Binary crate**: 실행 가능한 프로그램. `main.rs`가 진입점. (`nano-manager`가 이것)
+  - **Library crate**: 다른 크레이트가 가져다 쓰는 라이브러리. `lib.rs`가 진입점. (`nano-common`이 이것)
+  - 하나의 크레이트는 `Cargo.toml` 파일 하나로 정의된다.
+  - 외부 크레이트는 [crates.io](https://crates.io)에서 가져온다 (npm registry 같은 것).
+
+- **Cargo**: Rust의 빌드 도구 + 패키지 매니저. npm, pip 같은 역할.
+  - `cargo build` — 빌드 (npm run build)
+  - `cargo run` — 빌드 + 실행
+  - `cargo test` — 테스트 실행
+  - `cargo add <crate>` — 의존성 추가 (npm install)
+  - `Cargo.toml` — 프로젝트 설정 파일 (package.json)
+  - `Cargo.lock` — 정확한 의존성 버전 잠금 (package-lock.json)
+
+- **Trait (트레이트)**: 인터페이스와 비슷한 개념. 타입이 구현해야 할 동작을 정의한다.
+  - `Debug` — `{:?}` 포맷으로 출력 가능하게 함
+  - `Clone` — `.clone()`으로 깊은 복사 가능
+  - `Serialize` / `Deserialize` — JSON 등으로 변환 가능
+  - `#[derive(...)]`로 자동 구현을 붙일 수 있다 (보일러플레이트 제거).
+
 ### Rust 기초
 
 - **Cargo workspace**: 루트 `Cargo.toml`에 `[workspace]`를 선언하면 여러 크레이트를 하나의 프로젝트로 관리할 수 있다. `workspace.dependencies`로 의존성 버전을 중앙 관리하면 크레이트 간 버전 불일치를 방지할 수 있다.
