@@ -16,7 +16,7 @@ async fn main() -> Result<(), error::ManagerError> {
 
     // Port 8080: default for the manager HTTP API.
     let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
-    tracing::info!(%addr, "starting nano-manager");
+    tracing::info!(%addr, "starting manager");
 
     let listener = tokio::net::TcpListener::bind(addr)
         .await

@@ -19,4 +19,4 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Internal crates
-nano-common = { path = "crates/common" }
+common = { path = "crates/common" }
