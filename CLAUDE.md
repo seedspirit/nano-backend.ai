@@ -49,3 +49,11 @@ No unstructured text in API responses. Long-running operations return a pollable
 - No `unsafe` without a comment justifying why it is necessary
 - No panicking in library code
 - No `println!` for logging — use `tracing` crate
+
+## Skills
+
+Invoke with `/skill-name`. See `.claude/skills/README.md` for details.
+
+- `/rust-guide` — Rust coding conventions (error handling, types, async, quality)
+- `/tdd-guide` — TDD workflow (Red → Green → Refactor)
+- `/submit` — Quality checks, commit, PR creation
