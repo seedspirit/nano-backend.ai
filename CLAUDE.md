@@ -41,7 +41,8 @@ No unstructured text in API responses. Long-running operations return a pollable
 
 - Unit tests: `#[cfg(test)] mod tests` alongside source
 - Integration tests: top-level `tests/` directory
-- Every public function should have at least one test
+- Every public function must have both **success** and **error/edge** test scenarios
+- All tests must pass before PR submission — no exceptions
 
 ## Prohibitions
 

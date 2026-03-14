@@ -33,7 +33,34 @@ Post-implementation submission pipeline: quality enforcement, learning notes, co
    - `git log {base_branch}..HEAD` — existing commits on branch
    - Summarize changes to user before proceeding
 
-### Phase 2: Quality Enforcement
+### Phase 2: Test Verification
+
+**Mandatory — never skip. Must complete before quality checks.**
+
+1. **Inventory test scenarios**: List all tests in changed crates. For each public function or endpoint, confirm both success and failure scenarios exist.
+
+   ```
+   ## Test Coverage Report
+   ### <crate>::<module>
+   - ✅ success: <description>
+   - ✅ error: <description>
+   - ❌ missing: <what's not tested>
+   ```
+
+2. **Write missing tests**: If any public function lacks a success or failure scenario, write them now.
+
+   - **Success scenarios**: Valid input → expected output
+   - **Error/edge scenarios**: Invalid input, missing resource, boundary conditions → expected error type or behavior
+
+3. **Run tests and verify**:
+   ```bash
+   cargo test -- --nocapture 2>&1  # see all output
+   ```
+   - All tests must pass
+   - Both success and failure paths must be exercised
+   - If tests fail, fix and re-run (max 3 attempts)
+
+### Phase 3: Quality Enforcement
 
 **Mandatory — never skip.**
 
@@ -50,7 +77,7 @@ cargo test
 - If tests fail, fix and re-run
 - **All three must pass before continuing**
 
-### Phase 3: Learning Notes
+### Phase 4: Learning Notes
 
 **Mandatory — every PR must include a learning document.**
 
@@ -101,7 +128,7 @@ Date: YYYY-MM-DD
 - The "Further study" checklist should be actionable — specific topics, not vague
 - Present the draft to the user for review before committing
 
-### Phase 4: Commit
+### Phase 5: Commit
 
 1. **Stage changes** (including the learning doc)
    - `git add` specific files — avoid `-A`
@@ -114,7 +141,7 @@ Date: YYYY-MM-DD
 
 3. **Create commit** — present draft message to user for approval
 
-### Phase 5: PR Creation
+### Phase 6: PR Creation
 
 1. **Push branch**
    ```bash
@@ -169,7 +196,7 @@ Date: YYYY-MM-DD
 
 4. Report PR URL to user
 
-### Phase 6: Summary
+### Phase 7: Summary
 
 ```
 Submission Complete
