@@ -21,6 +21,13 @@ See `README.md` for project overview, architecture, and tech stack.
 - Lint: `cargo clippy -- -D warnings` — treat all warnings as errors
 - Write English comments; Korean is acceptable in design docs under `docs/`
 
+## Branch Naming
+
+`<type>/<short-description>` — examples:
+
+- `feat/health-api`, `fix/session-timeout`, `refactor/error-handling`
+- Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`
+
 ## API Response Conventions
 
 All external API responses use structured JSON:
