@@ -56,4 +56,4 @@ Invoke with `/skill-name`. See `.claude/skills/README.md` for details.
 
 Development: `/rust-guide`, `/tdd-guide`, `/submit`
 Issues: `/create-issue`, `/analyze`
-Automation: `/spawn-worker`
+Automation: `/autopilot`, `/pilot`, `/spawn-worker`

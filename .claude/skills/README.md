@@ -23,20 +23,24 @@ Skills provide focused guides for AI agents. Invoke with `/skill-name`.
 
 | Skill | Purpose | Use When |
 |-------|---------|----------|
-| `/spawn-worker` | Spawn autonomous worker in tmux for a GitHub issue | Delegating an issue to a background worker |
+| `/autopilot` | Fully automated: triggers skills sequentially, self-review, PR | Routine tasks, trusted flow |
+| `/pilot` | Same pipeline, user controls every phase transition | Learning, complex tasks, first-time features |
+| `/spawn-worker` | Spawn autonomous worker in tmux for a GitHub issue | Delegating to a background worker |
 
 ## Workflow
 
 ```
-analyze → create-issue ─┐
-                        ├──→ spawn-worker ──→ [ worker session ]
-         (manual) ──────┘         │
-                          rust-guide (always active)
-                                  │
-                                  ▼
-                             tdd-guide → implement → submit
-                                                       │
-                                              PR links issue + learning notes
+              /autopilot (auto) or /pilot (user-controlled)
+              ┌─────────────────────────────────────────────────────────┐
+              │  /create-issue → plan → /tdd-guide → review → /submit  │
+instruction ──→       ↑            ↑         ↑          ↑        ↑     │──→ PR
+              │    trigger     approve    trigger    /rust-guide trigger │
+              └─────────────────────────────────────────────────────────┘
+  autopilot: auto-proceed (stops only at plan approval)
+  pilot:     stops at every phase, user says "next"
+
+              /spawn-worker (background, tmux)
+analyze → create-issue → spawn-worker → [ worker session ] → submit
 ```
 
 ## Related Documents
