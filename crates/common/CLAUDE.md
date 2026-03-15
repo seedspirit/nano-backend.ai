@@ -1,16 +1,16 @@
 # Common Crate — Agent Guidelines
 
-Workspace 전체에서 공유하는 타입과 계약(contract)을 정의하는 라이브러리 크레이트.
+Library crate that defines shared types and contracts used across the entire workspace.
 
 ## Role
 
-- 모든 크레이트가 의존하는 공유 타입 제공 (`ApiResponse`, `CommonError`)
-- API 응답 형식의 단일 진실 공급원 (single source of truth)
-- 런타임 로직 없음 — 순수 데이터 구조와 trait만 포함
+- Provide shared types depended on by all other crates (`ApiResponse`, `CommonError`)
+- Single source of truth for the API response format
+- No runtime logic — only pure data structures and traits
 
 ## Rules
 
-- `ApiResponse` 변경은 모든 소비자에게 영향 — 변경 전 하위 크레이트 테스트 확인 필수
-- 다른 workspace 크레이트에 의존 금지 (의존 그래프의 최하위 계층)
-- 새 공개 타입 추가 시 `lib.rs`에 `pub use` re-export 필수
-- 에러 타입은 인프라 수준만 — 도메인 에러는 각 크레이트에서 정의
+- Changes to `ApiResponse` affect all consumers — verify downstream crate tests before merging
+- Must not depend on any other workspace crate (leaf of the dependency graph)
+- New public types must be re-exported via `pub use` in `lib.rs`
+- Error types are infrastructure-level only — domain errors belong in each crate
