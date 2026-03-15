@@ -58,6 +58,41 @@ No unstructured text in API responses. Long-running operations return a pollable
 - No panicking in library code
 - No `println!` for logging — use `tracing` crate
 
+## Work Decomposition
+
+Decompose work into Epic → Story → Task.
+
+| Unit | Definition | Size guide |
+|------|-----------|------------|
+| **Epic** | A single business goal. Composed of multiple Stories/PRs | Tracked via GitHub Milestone |
+| **Story** | 1 PR = one clear deliverable. The core unit for achieving an Epic | One learning session's worth; small enough for an AI agent to design and execute without gaps |
+| **Task** | A one-off chore smaller than a Story. Not core to the Epic but needed for progress (env setup, label creation, CI fixes, etc.) | Single commit or no commit needed |
+
+### Principles
+
+- **Single goal**: If you need "and" to describe it, split it
+- **Vertical slice**: Each Story includes type definition → implementation → tests (never slice horizontally)
+- **Independently executable**: Each Story can be developed and tested alone, given prior Stories are merged
+- **Acceptance Criteria required**: No AC means it is not a Story
+- **Parallelism first**: Minimize inter-Story dependencies so they can proceed concurrently
+
+### Design Principles for Parallelism
+
+Code design must support parallel Story execution:
+
+- **Trait/interface first**: Finalize abstractions in a preceding Story so implementation Stories can proceed in parallel
+- **Enforce behavior via structure**: Use compile-time contracts to prevent integration mismatches
+- **Localize modifications**: Design boundaries so changes are contained within a single module
+- **Explicit dependency graph**: When creating an Epic, annotate blocks/blockedBy between Stories to visualize parallelizable segments
+
+### Size Threshold
+
+Split a Story further if any of the following apply:
+
+- Expected to change more than 5 files
+- Introduces 2 or more new concepts simultaneously
+- Has more than 3 ACs
+
 ## Skills
 
 Invoke with `/skill-name`. See `.claude/skills/README.md` for details.
