@@ -15,7 +15,7 @@ async fn main() -> Result<(), error::ManagerError> {
     let app = app::build_router();
 
     // Port 8080: default for the manager HTTP API.
-    let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
+    let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
     tracing::info!(%addr, "starting manager");
 
     let listener = tokio::net::TcpListener::bind(addr)

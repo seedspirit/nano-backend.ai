@@ -6,16 +6,16 @@ Date: 2026-03-14
 ## What was done
 
 - Cargo workspace로 멀티 크레이트 프로젝트 초기 구성 (`crates/common`, `crates/manager`)
-- `nano-common` 크레이트에 `ApiResponse` 공유 타입 정의
-- `nano-manager` 크레이트에 axum 기반 `GET /health` 엔드포인트 구현
+- `common` 크레이트에 `ApiResponse` 공유 타입 정의
+- `manager` 크레이트에 axum 기반 `GET /health` 엔드포인트 구현
 
 ## Concepts learned
 
 ### Rust 기초 용어
 
 - **Crate (크레이트)**: Rust의 컴파일 단위이자 패키지. Python의 패키지, Java의 jar와 비슷한 개념.
-  - **Binary crate**: 실행 가능한 프로그램. `main.rs`가 진입점. (`nano-manager`가 이것)
-  - **Library crate**: 다른 크레이트가 가져다 쓰는 라이브러리. `lib.rs`가 진입점. (`nano-common`이 이것)
+  - **Binary crate**: 실행 가능한 프로그램. `main.rs`가 진입점. (`manager`가 이것)
+  - **Library crate**: 다른 크레이트가 가져다 쓰는 라이브러리. `lib.rs`가 진입점. (`common`이 이것)
   - 하나의 크레이트는 `Cargo.toml` 파일 하나로 정의된다.
   - 외부 크레이트는 [crates.io](https://crates.io)에서 가져온다 (npm registry 같은 것).
 
@@ -46,14 +46,14 @@ Date: 2026-03-14
   tokio = { workspace = true }  # 버전을 루트에서 상속
   ```
 
-- **모듈 시스템**: `mod`로 모듈을 선언하고, `pub`으로 외부에 노출한다. `lib.rs`에서 `pub use`로 재수출(re-export)하면 외부에서 `nano_common::ApiResponse`처럼 짧은 경로로 접근 가능.
+- **모듈 시스템**: `mod`로 모듈을 선언하고, `pub`으로 외부에 노출한다. `lib.rs`에서 `pub use`로 재수출(re-export)하면 외부에서 `common::ApiResponse`처럼 짧은 경로로 접근 가능.
   ```rust
   // crates/common/src/lib.rs
   pub mod response;
   pub use response::ApiResponse;  // 재수출
 
   // 외부에서 사용할 때
-  use nano_common::ApiResponse;   // response 모듈을 거치지 않고 바로 접근
+  use common::ApiResponse;   // response 모듈을 거치지 않고 바로 접근
   ```
 
 - **`impl Into<String>` 패턴**: 함수 파라미터에 `impl Into<String>`을 쓰면 `&str`과 `String` 모두 받을 수 있다. 호출 시 `.into()` 없이 `"문자열 리터럴"`을 직접 넘길 수 있어 편리.
