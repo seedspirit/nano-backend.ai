@@ -79,11 +79,22 @@ cargo test
 
 ### Phase 4: Learning Notes
 
-**Mandatory — every PR must include a learning document.**
+**Mandatory — every PR must include learning documents.**
 
-Generate `docs/learn/NNNN-<slug>.md` where `NNNN` is a zero-padded sequence number and `<slug>` summarizes the PR topic.
+Create a directory `docs/learn/NNNN-<slug>/` where `NNNN` is a zero-padded sequence number and `<slug>` summarizes the PR topic. Inside, generate **separate MD files per category**. Only create files for categories that have meaningful content — skip empty categories.
 
-#### Template
+#### Directory structure
+
+```
+docs/learn/NNNN-<slug>/
+├── README.md              # Always created — PR summary and category index
+├── code-design.md         # Code design learnings (if applicable)
+├── cs.md                  # CS concepts (if applicable)
+├── rust.md                # Rust programming (if applicable)
+└── backend-ai.md          # Backend.AI architecture (if applicable)
+```
+
+#### README.md (always created)
 
 ```markdown
 # <Title matching PR topic>
@@ -95,18 +106,12 @@ Date: YYYY-MM-DD
 
 <1-3 bullet summary of the implementation>
 
-## Concepts learned
+## Categories
 
-### Rust
-- <Language features, patterns, or idioms used for the first time or reinforced>
-- <Ownership / lifetime / async nuances encountered>
-
-### Architecture / Design
-- <Backend.AI architecture concepts touched (e.g., Manager-Agent split, job lifecycle)>
-- <Design patterns applied (e.g., trait-based DI, builder pattern, newtype)>
-
-### Systems / Infra
-- <Database, Redis, gRPC, networking concepts if relevant>
+- [Code Design](./code-design.md) — only link if file exists
+- [CS](./cs.md)
+- [Rust Programming](./rust.md)
+- [Backend.AI Architecture](./backend-ai.md)
 
 ## Key decisions
 
@@ -120,12 +125,70 @@ Date: YYYY-MM-DD
 - [ ] <Related Backend.AI code to read: path or link>
 ```
 
+#### code-design.md — Code Design
+
+Functional/OOP design patterns, SOLID principles, DI, type design, module structure, etc.
+
+```markdown
+# Code Design
+
+## <Topic 1>
+<Explanation, example code, links to relevant source files>
+
+## <Topic 2>
+...
+```
+
+#### cs.md — CS Concepts
+
+Data structures, algorithms, networking, OS, concurrency, protocols — language-agnostic CS knowledge.
+
+```markdown
+# CS
+
+## <Topic 1>
+<Explanation, examples, references>
+
+## <Topic 2>
+...
+```
+
+#### rust.md — Rust Programming
+
+Rust syntax, ownership/borrowing, traits, macros, async/await, crate usage — Rust-specific knowledge.
+
+```markdown
+# Rust Programming
+
+## <Topic 1>
+<Explanation, code examples, official doc links>
+
+## <Topic 2>
+...
+```
+
+#### backend-ai.md — Backend.AI Architecture
+
+Backend.AI's Manager/Agent/Storage structure, session lifecycle, API design, domain models, etc.
+
+```markdown
+# Backend.AI Architecture
+
+## <Topic 1>
+<Explanation, architecture diagrams, related code paths>
+
+## <Topic 2>
+...
+```
+
 #### Rules
 
 - Write in **Korean** (이 문서는 학습용이므로 한국어로 작성)
-- Keep it concise — focus on *what you learned*, not restating the code
+- **One concept = one `##` section** — explain each concept in depth
+- Keep each file focused — do not include content that belongs in another category
 - Link to relevant source files, docs, or external references
-- The "Further study" checklist should be actionable — specific topics, not vague
+- The "Further study" checklist in README.md should be actionable — specific topics, not vague
+- **Skip empty categories** — do not create files for categories with no learnings in this PR, and remove them from the Categories list in README.md
 - Present the draft to the user for review before committing
 
 ### Phase 5: Commit
@@ -158,20 +221,28 @@ Date: YYYY-MM-DD
 
    Resolves #<number>
 
-   **Problem**: <1-2 sentence summary of the issue>
+   **Problem**: <What was wrong or missing? 1-2 sentences.>
 
    ## Solution
 
-   <How the issue was resolved — approach taken, key changes>
+   **Approach**: <Why this approach? Key design choice and reasoning.>
 
-   ## Summary
-   <1-3 bullet points of what changed>
+   ### Changes
+   - `crate/module/file` — <what changed and why>
+   - `crate/module/file` — <what changed and why>
+
+   ### Key Decisions
+   | Decision | Why |
+   |----------|-----|
+   | <e.g., used newtype pattern> | <reason> |
 
    ## What I learned
-   <1-2 sentences linking to the learning doc>
+   <1-2 sentences linking to the learning doc directory>
+   See: `docs/learn/NNNN-<slug>/`
 
-   ## Test plan
-   - [ ] <test items>
+   ## Test Plan
+   - [ ] <scenario: what is being verified>
+   - [ ] <scenario>
    EOF
    )"
    ```
@@ -180,14 +251,25 @@ Date: YYYY-MM-DD
 
    ```bash
    gh pr create --title "type(scope): description" --body "$(cat <<'EOF'
-   ## Summary
-   <1-3 bullet points>
+   ## Background
+   <Why this change? What problem or need does it address?>
+
+   ## Changes
+   - `crate/module/file` — <what changed and why>
+   - `crate/module/file` — <what changed and why>
+
+   ### Key Decisions
+   | Decision | Why |
+   |----------|-----|
+   | <e.g., chose X over Y> | <reason> |
 
    ## What I learned
-   <1-2 sentences linking to the learning doc>
+   <1-2 sentences linking to the learning doc directory>
+   See: `docs/learn/NNNN-<slug>/`
 
-   ## Test plan
-   - [ ] <test items>
+   ## Test Plan
+   - [ ] <scenario: what is being verified>
+   - [ ] <scenario>
    EOF
    )"
    ```
@@ -204,7 +286,7 @@ Submission Complete
   PR:        #{number} - {title}
   URL:       {url}
   Branch:    {branch_name}
-  Learn doc: docs/learn/NNNN-<slug>.md
+  Learn doc: docs/learn/NNNN-<slug>/
 
 Quality: All passed (fmt, clippy, test)
 Commits: {count} commit(s)
