@@ -1,6 +1,6 @@
 # Agent Crate Scaffold
 
-PR: pending
+PR: #20
 Date: 2026-03-15
 
 ## What was done
