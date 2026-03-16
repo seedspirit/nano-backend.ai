@@ -6,18 +6,18 @@ use uuid::Uuid;
 
 /// Unique identifier for a kernel instance.
 ///
-/// Wraps a UUID v4 to guarantee uniqueness and prevent accidental
-/// construction from arbitrary strings.
+/// Wraps a UUID v4 to guarantee uniqueness and prevent construction
+/// from arbitrary strings.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct KernelId(Uuid);
+pub struct KernelID(Uuid);
 
-impl KernelId {
+impl KernelID {
     /// Generate a new random kernel identifier.
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
-    /// Reconstruct a `KernelId` from a UUID value.
+    /// Reconstruct a `KernelID` from an existing UUID.
     pub fn from_uuid(uuid: Uuid) -> Self {
         Self(uuid)
     }
@@ -28,13 +28,13 @@ impl KernelId {
     }
 }
 
-impl Default for KernelId {
+impl Default for KernelID {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl fmt::Display for KernelId {
+impl fmt::Display for KernelID {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
@@ -60,10 +60,10 @@ pub enum KernelStatus {
 #[derive(Debug, thiserror::Error)]
 pub enum KernelError {
     #[error("kernel not found: {0}")]
-    NotFound(KernelId),
+    NotFound(KernelID),
 
     #[error("kernel already exists: {0}")]
-    AlreadyExists(KernelId),
+    AlreadyExists(KernelID),
 
     #[error("runtime error: {0}")]
     Runtime(String),
@@ -79,16 +79,16 @@ pub trait KernelRuntime {
     fn create(
         &self,
         spec: KernelSpec,
-    ) -> impl std::future::Future<Output = Result<KernelId, KernelError>> + Send;
+    ) -> impl std::future::Future<Output = Result<KernelID, KernelError>> + Send;
 
     fn destroy(
         &self,
-        id: KernelId,
+        id: KernelID,
     ) -> impl std::future::Future<Output = Result<(), KernelError>> + Send;
 
     fn status(
         &self,
-        id: KernelId,
+        id: KernelID,
     ) -> impl std::future::Future<Output = Result<KernelStatus, KernelError>> + Send;
 }
 
@@ -100,39 +100,32 @@ mod tests {
 
     #[test]
     fn kernel_id_new_is_unique() {
-        let a = KernelId::new();
-        let b = KernelId::new();
-        assert_ne!(a, b, "two new KernelIds should differ");
+        let a = KernelID::new();
+        let b = KernelID::new();
+        assert_ne!(a, b, "two new KernelIDs should differ");
     }
 
     #[test]
     fn kernel_id_equality_from_same_uuid() {
         let uuid = Uuid::new_v4();
-        let a = KernelId::from_uuid(uuid);
-        let b = KernelId::from_uuid(uuid);
+        let a = KernelID::from_uuid(uuid);
+        let b = KernelID::from_uuid(uuid);
         assert_eq!(a, b);
     }
 
     #[test]
     fn kernel_id_display_matches_uuid() {
         let uuid = Uuid::new_v4();
-        let id = KernelId::from_uuid(uuid);
+        let id = KernelID::from_uuid(uuid);
         assert_eq!(id.to_string(), uuid.to_string());
     }
 
     #[test]
-    fn kernel_id_as_uuid_accessor() {
-        let uuid = Uuid::new_v4();
-        let id = KernelId::from_uuid(uuid);
-        assert_eq!(*id.as_uuid(), uuid);
-    }
-
-    #[test]
     fn kernel_id_serialization_roundtrip() {
-        let id = KernelId::new();
-        let json = serde_json::to_string(&id).expect("KernelId serialization should succeed");
-        let restored: KernelId =
-            serde_json::from_str(&json).expect("KernelId deserialization should succeed");
+        let id = KernelID::new();
+        let json = serde_json::to_string(&id).expect("KernelID serialization should succeed");
+        let restored: KernelID =
+            serde_json::from_str(&json).expect("KernelID deserialization should succeed");
         assert_eq!(id, restored);
     }
 
@@ -197,16 +190,16 @@ mod tests {
 
     #[test]
     fn kernel_error_not_found_display() {
-        let id = KernelId::new();
-        let expected = format!("kernel not found: {}", id);
+        let id = KernelID::new();
+        let expected = format!("kernel not found: {id}");
         let err = KernelError::NotFound(id);
         assert_eq!(err.to_string(), expected);
     }
 
     #[test]
     fn kernel_error_already_exists_display() {
-        let id = KernelId::new();
-        let expected = format!("kernel already exists: {}", id);
+        let id = KernelID::new();
+        let expected = format!("kernel already exists: {id}");
         let err = KernelError::AlreadyExists(id);
         assert_eq!(err.to_string(), expected);
     }

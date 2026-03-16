@@ -5,10 +5,10 @@
 **Newtype**은 기존 타입을 단일 필드 struct로 감싸서 새로운 타입을 만드는 패턴이다.
 
 ```rust
-pub struct KernelId(pub String);
+pub struct KernelID(pub String);
 ```
 
-### 왜 `String` 대신 `KernelId`를 쓰는가?
+### 왜 `String` 대신 `KernelID`를 쓰는가?
 
 ```rust
 // ❌ 이렇게 하면 커널 ID와 사용자 ID가 타입 수준에서 구분 불가
@@ -16,7 +16,7 @@ fn destroy(kernel_id: String, user_id: String) { ... }
 destroy(user_id, kernel_id);  // 인자 순서 뒤바뀌어도 컴파일 통과!
 
 // ✅ Newtype을 쓰면 컴파일러가 잡아줌
-fn destroy(kernel_id: KernelId, user_id: UserId) { ... }
+fn destroy(kernel_id: KernelID, user_id: UserId) { ... }
 destroy(user_id, kernel_id);  // 컴파일 에러!
 ```
 
@@ -27,10 +27,10 @@ destroy(user_id, kernel_id);  // 컴파일 에러!
 
 ```rust
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct KernelId(pub String);
+pub struct KernelID(pub String);
 ```
 
-- `Hash` — HashMap의 키로 사용하기 위해 필요 (S3에서 `HashMap<KernelId, Child>` 예정)
+- `Hash` — HashMap의 키로 사용하기 위해 필요 (S3에서 `HashMap<KernelID, Child>` 예정)
 - `Display` — 로그 출력, 에러 메시지에서 사용하기 위해 수동 구현
 
 참고: `crates/common/src/kernel.rs`
@@ -82,8 +82,8 @@ pub enum CommonError {
 
 // KernelError — 도메인 수준 에러 (커널 조작 실패)
 pub enum KernelError {
-    NotFound(KernelId),
-    AlreadyExists(KernelId),
+    NotFound(KernelID),
+    AlreadyExists(KernelID),
     Runtime(String),
 }
 ```

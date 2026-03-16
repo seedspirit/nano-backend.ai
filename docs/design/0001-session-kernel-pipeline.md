@@ -43,9 +43,9 @@ struct Agent {
 
 // 커널 라이프사이클만 추상화
 trait KernelRuntime {
-    async fn create(&self, spec: KernelSpec) -> Result<KernelId>;
-    async fn destroy(&self, id: KernelId) -> Result<()>;
-    async fn status(&self, id: KernelId) -> Result<KernelStatus>;
+    async fn create(&self, spec: KernelSpec) -> Result<KernelID>;
+    async fn destroy(&self, id: KernelID) -> Result<()>;
+    async fn status(&self, id: KernelID) -> Result<KernelStatus>;
 }
 
 // 구현체는 각각 독립 모듈
@@ -69,9 +69,9 @@ Agent를 trait으로 만들고, 환경마다 전체 구현체를 따로 둔다.
 
 ```rust
 trait AgentBehavior {
-    async fn create_kernel(&self, spec: KernelSpec) -> Result<KernelId>;
-    async fn destroy_kernel(&self, id: KernelId) -> Result<()>;
-    async fn status(&self, id: KernelId) -> Result<KernelStatus>;
+    async fn create_kernel(&self, spec: KernelSpec) -> Result<KernelID>;
+    async fn destroy_kernel(&self, id: KernelID) -> Result<()>;
+    async fn status(&self, id: KernelID) -> Result<KernelStatus>;
     async fn register(&self) -> Result<()>;
     async fn heartbeat(&self) -> Result<()>;
     async fn report_resources(&self) -> Result<Resources>;
@@ -172,7 +172,7 @@ S1 → S2 ─┬→ S3
 |------|------|
 | **Goal** | 커널 관련 공통 타입과 KernelRuntime trait을 common crate에 정의한다 |
 | **Component** | common |
-| **AC** | 1) `KernelId`, `KernelSpec`, `KernelStatus` 타입 정의 (Serialize/Deserialize) 2) `KernelRuntime` trait에 `create`, `destroy`, `status` async 메서드 존재 3) 타입 생성 및 직렬화 단위 테스트 |
+| **AC** | 1) `KernelID`, `KernelSpec`, `KernelStatus` 타입 정의 (Serialize/Deserialize) 2) `KernelRuntime` trait에 `create`, `destroy`, `status` async 메서드 존재 3) 타입 생성 및 직렬화 단위 테스트 |
 | **Notes** | `KernelSpec`은 최소한 실행할 명령어(command)를 포함. `KernelStatus`는 enum으로 `Running`, `Exited`, `Failed` 등. async trait은 Rust 1.75+에서 네이티브 지원되므로 `async-trait` crate 불필요할 수 있음. |
 
 #### S3. LocalProcess 런타임 — create/destroy
@@ -181,8 +181,8 @@ S1 → S2 ─┬→ S3
 |------|------|
 | **Goal** | KernelRuntime trait의 LocalProcess 구현체를 만들어 child process를 생성/종료한다 |
 | **Component** | agent |
-| **AC** | 1) `create()` 호출 시 child process 기동, `KernelId` 반환 2) `destroy()` 호출 시 프로세스 종료 3) 존재하지 않는 커널 destroy 시 에러 반환 |
-| **Notes** | `tokio::process::Command` 사용. 프로세스 핸들은 `HashMap<KernelId, Child>`로 관리. 테스트에서는 `sleep` 또는 `cat` 같은 장시간 실행 명령어 사용. |
+| **AC** | 1) `create()` 호출 시 child process 기동, `KernelID` 반환 2) `destroy()` 호출 시 프로세스 종료 3) 존재하지 않는 커널 destroy 시 에러 반환 |
+| **Notes** | `tokio::process::Command` 사용. 프로세스 핸들은 `HashMap<KernelID, Child>`로 관리. 테스트에서는 `sleep` 또는 `cat` 같은 장시간 실행 명령어 사용. |
 | **의존** | S1 (crate 존재), S2 (trait 정의) |
 
 #### S4. LocalProcess 런타임 — status 조회
