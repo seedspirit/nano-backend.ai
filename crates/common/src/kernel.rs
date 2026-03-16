@@ -1,11 +1,38 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use uuid::Uuid;
 
 // ── Types ──────────────────────────────────────────────
 
 /// Unique identifier for a kernel instance.
+///
+/// Wraps a UUID v4 to guarantee uniqueness and prevent accidental
+/// construction from arbitrary strings.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct KernelId(pub String);
+pub struct KernelId(Uuid);
+
+impl KernelId {
+    /// Generate a new random kernel identifier.
+    pub fn new() -> Self {
+        Self(Uuid::new_v4())
+    }
+
+    /// Reconstruct a `KernelId` from a UUID value.
+    pub fn from_uuid(uuid: Uuid) -> Self {
+        Self(uuid)
+    }
+
+    /// Return the inner UUID.
+    pub fn as_uuid(&self) -> &Uuid {
+        &self.0
+    }
+}
+
+impl Default for KernelId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl fmt::Display for KernelId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -72,19 +99,41 @@ mod tests {
     use super::*;
 
     #[test]
-    fn kernel_id_equality() {
-        let a = KernelId("k-001".to_string());
-        let b = KernelId("k-001".to_string());
-        let c = KernelId("k-002".to_string());
-
-        assert_eq!(a, b);
-        assert_ne!(a, c);
+    fn kernel_id_new_is_unique() {
+        let a = KernelId::new();
+        let b = KernelId::new();
+        assert_ne!(a, b, "two new KernelIds should differ");
     }
 
     #[test]
-    fn kernel_id_display() {
-        let id = KernelId("k-123".to_string());
-        assert_eq!(id.to_string(), "k-123");
+    fn kernel_id_equality_from_same_uuid() {
+        let uuid = Uuid::new_v4();
+        let a = KernelId::from_uuid(uuid);
+        let b = KernelId::from_uuid(uuid);
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn kernel_id_display_matches_uuid() {
+        let uuid = Uuid::new_v4();
+        let id = KernelId::from_uuid(uuid);
+        assert_eq!(id.to_string(), uuid.to_string());
+    }
+
+    #[test]
+    fn kernel_id_as_uuid_accessor() {
+        let uuid = Uuid::new_v4();
+        let id = KernelId::from_uuid(uuid);
+        assert_eq!(*id.as_uuid(), uuid);
+    }
+
+    #[test]
+    fn kernel_id_serialization_roundtrip() {
+        let id = KernelId::new();
+        let json = serde_json::to_string(&id).expect("KernelId serialization should succeed");
+        let restored: KernelId =
+            serde_json::from_str(&json).expect("KernelId deserialization should succeed");
+        assert_eq!(id, restored);
     }
 
     #[test]
@@ -96,7 +145,7 @@ mod tests {
                 "print('hi')".to_string(),
             ],
         };
-        let json = serde_json::to_value(&spec).unwrap();
+        let json = serde_json::to_value(&spec).expect("KernelSpec serialization should succeed");
 
         assert_eq!(
             json["command"],
@@ -107,7 +156,8 @@ mod tests {
     #[test]
     fn kernel_spec_deserializes() {
         let json = r#"{"command":["sleep","10"]}"#;
-        let spec: KernelSpec = serde_json::from_str(json).unwrap();
+        let spec: KernelSpec =
+            serde_json::from_str(json).expect("KernelSpec deserialization should succeed");
 
         assert_eq!(spec.command, vec!["sleep", "10"]);
     }
@@ -115,7 +165,8 @@ mod tests {
     #[test]
     fn kernel_status_running_serializes() {
         let status = KernelStatus::Running;
-        let json = serde_json::to_string(&status).unwrap();
+        let json = serde_json::to_string(&status)
+            .expect("KernelStatus::Running serialization should succeed");
 
         assert!(json.contains("Running"));
     }
@@ -123,8 +174,10 @@ mod tests {
     #[test]
     fn kernel_status_exited_roundtrip() {
         let status = KernelStatus::Exited { code: 0 };
-        let json = serde_json::to_string(&status).unwrap();
-        let restored: KernelStatus = serde_json::from_str(&json).unwrap();
+        let json = serde_json::to_string(&status)
+            .expect("KernelStatus::Exited serialization should succeed");
+        let restored: KernelStatus = serde_json::from_str(&json)
+            .expect("KernelStatus::Exited deserialization should succeed");
 
         assert_eq!(status, restored);
     }
@@ -134,22 +187,28 @@ mod tests {
         let status = KernelStatus::Failed {
             reason: "out of memory".to_string(),
         };
-        let json = serde_json::to_string(&status).unwrap();
-        let restored: KernelStatus = serde_json::from_str(&json).unwrap();
+        let json = serde_json::to_string(&status)
+            .expect("KernelStatus::Failed serialization should succeed");
+        let restored: KernelStatus = serde_json::from_str(&json)
+            .expect("KernelStatus::Failed deserialization should succeed");
 
         assert_eq!(status, restored);
     }
 
     #[test]
     fn kernel_error_not_found_display() {
-        let err = KernelError::NotFound(KernelId("k-999".to_string()));
-        assert_eq!(err.to_string(), "kernel not found: k-999");
+        let id = KernelId::new();
+        let expected = format!("kernel not found: {}", id);
+        let err = KernelError::NotFound(id);
+        assert_eq!(err.to_string(), expected);
     }
 
     #[test]
     fn kernel_error_already_exists_display() {
-        let err = KernelError::AlreadyExists(KernelId("k-001".to_string()));
-        assert_eq!(err.to_string(), "kernel already exists: k-001");
+        let id = KernelId::new();
+        let expected = format!("kernel already exists: {}", id);
+        let err = KernelError::AlreadyExists(id);
+        assert_eq!(err.to_string(), expected);
     }
 
     #[test]
