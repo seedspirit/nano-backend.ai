@@ -11,14 +11,13 @@ reviews:
   poem: false
   path_filters:
     - "!target/**"
-    - "!Cargo.lock"
     - "!docs/learn/**"
   path_instructions:
     - path: "crates/**/*.rs"
       instructions: |
         This is a Rust project using Tokio async runtime and Axum web framework.
         Enforce these rules strictly:
-        - No .unwrap() or .expect() in production code — must use Result or ?
+        - No .unwrap() or .expect() in production code (tests/benches/examples are allowed with explicit failure messages)
         - No unsafe without justification comment
         - No println! — use tracing crate (debug!, info!, warn!, error!)
         - No panicking in library code
