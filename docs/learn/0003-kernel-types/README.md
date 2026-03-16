@@ -1,6 +1,6 @@
 # Kernel 공통 타입 및 KernelRuntime trait 정의
 
-PR: pending
+PR: #22
 Date: 2026-03-15
 
 ## What was done
