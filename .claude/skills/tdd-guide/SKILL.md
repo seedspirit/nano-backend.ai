@@ -1,12 +1,12 @@
 ---
 name: tdd-guide
-description: Test-Driven Development workflow for Rust — Red-Green-Refactor cycle, scenario definition, test patterns
+description: Test-Driven Development workflow for Go — Red-Green-Refactor cycle, scenario definition, test patterns
 user-invocable: true
 ---
 
 # TDD Workflow Guide
 
-Test-Driven Development workflow for nano-backend.ai (Rust).
+Test-Driven Development workflow for nano-backend.ai (Go).
 
 ## TDD Cycle
 
@@ -40,86 +40,151 @@ Before writing any code, document success and error cases:
 ## Test Target: Job Submission
 
 ### Success Scenarios
-1. Valid job with available agent → Returns JobId, status=Pending
-2. Job with optional fields omitted → Uses defaults, returns JobId
+1. Valid job with available agent → Returns JobID, status=Pending
+2. Job with optional fields omitted → Uses defaults, returns JobID
 
 ### Error Scenarios
-1. Unknown executor type → JobError::InvalidExecutor
-2. No agents available → JobError::NoAgentAvailable
-3. Duplicate job ID → JobError::AlreadyExists
+1. Unknown executor type → ErrInvalidExecutor
+2. No agents available → ErrNoAgentAvailable
+3. Duplicate job ID → ErrAlreadyExists
 ```
 
 ## Step 2: Write Failing Tests
 
 Write tests BEFORE implementation.
 
-### Unit Test Pattern (in-module)
+### Unit Test Pattern (same package)
 
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
+```go
+package scheduler
 
-    #[test]
-    fn submit_valid_job_returns_id() {
-        let scheduler = JobScheduler::new(/* test deps */);
-        let request = SubmitRequest::builder()
-            .executor("python")
-            .build();
+import "testing"
 
-        let result = scheduler.submit(request);
-
-        assert!(result.is_ok());
-        let job = result.unwrap();
-        assert_eq!(job.status, JobStatus::Pending);
+func TestSubmitValidJobReturnsID(t *testing.T) {
+    sched := NewJobScheduler( /* test deps */ )
+    request := SubmitRequest{
+        Executor: "python",
     }
 
-    #[test]
-    fn submit_unknown_executor_returns_error() {
-        let scheduler = JobScheduler::new(/* test deps */);
-        let request = SubmitRequest::builder()
-            .executor("nonexistent")
-            .build();
+    job, err := sched.Submit(request)
 
-        let result = scheduler.submit(request);
+    if err != nil {
+        t.Fatalf("unexpected error: %v", err)
+    }
+    if job.Status != StatusPending {
+        t.Errorf("got status %v, want %v", job.Status, StatusPending)
+    }
+}
 
-        assert!(matches!(result, Err(JobError::InvalidExecutor(_))));
+func TestSubmitUnknownExecutorReturnsError(t *testing.T) {
+    sched := NewJobScheduler( /* test deps */ )
+    request := SubmitRequest{
+        Executor: "nonexistent",
+    }
+
+    _, err := sched.Submit(request)
+
+    if !errors.Is(err, ErrInvalidExecutor) {
+        t.Errorf("got error %v, want ErrInvalidExecutor", err)
     }
 }
 ```
 
-### Async Test Pattern
+### Table-Driven Test Pattern
 
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
+```go
+func TestParseConfig(t *testing.T) {
+    tests := []struct {
+        name    string
+        input   string
+        want    Config
+        wantErr error
+    }{
+        {
+            name:  "valid config",
+            input: `{"port": 8080}`,
+            want:  Config{Port: 8080},
+        },
+        {
+            name:    "invalid JSON",
+            input:   "bad data",
+            wantErr: ErrParseFailed,
+        },
+        {
+            name:    "missing required field",
+            input:   `{}`,
+            wantErr: ErrValidation,
+        },
+    }
 
-    #[tokio::test]
-    async fn agent_registers_successfully() {
-        let registry = AgentRegistry::new_for_test().await;
-
-        let result = registry.register("agent-1", "127.0.0.1:9000").await;
-
-        assert!(result.is_ok());
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            got, err := ParseConfig(tt.input)
+            if tt.wantErr != nil {
+                if !errors.Is(err, tt.wantErr) {
+                    t.Errorf("got error %v, want %v", err, tt.wantErr)
+                }
+                return
+            }
+            if err != nil {
+                t.Fatalf("unexpected error: %v", err)
+            }
+            if got != tt.want {
+                t.Errorf("got %+v, want %+v", got, tt.want)
+            }
+        })
     }
 }
 ```
 
-### Integration Test Pattern (`tests/` directory)
+### HTTP Handler Test Pattern
 
-```rust
-// tests/job_lifecycle.rs
-use nano_backend::prelude::*;
+```go
+package manager_test
 
-#[tokio::test]
-async fn job_completes_end_to_end() {
-    let app = TestApp::spawn().await;
+import (
+    "net/http"
+    "net/http/httptest"
+    "testing"
+)
 
-    let job_id = app.submit_job(test_request()).await.unwrap();
-    let status = app.poll_until_done(job_id).await.unwrap();
+func TestHealthEndpoint(t *testing.T) {
+    handler := NewRouter()
+    req := httptest.NewRequest(http.MethodGet, "/health", nil)
+    rec := httptest.NewRecorder()
 
-    assert_eq!(status, JobStatus::Completed);
+    handler.ServeHTTP(rec, req)
+
+    if rec.Code != http.StatusOK {
+        t.Errorf("got status %d, want %d", rec.Code, http.StatusOK)
+    }
+}
+```
+
+### Integration Test Pattern (`_test.go` with build tag)
+
+```go
+//go:build integration
+
+package integration
+
+import "testing"
+
+func TestJobCompletesEndToEnd(t *testing.T) {
+    app := SpawnTestApp(t)
+
+    jobID, err := app.SubmitJob(testRequest())
+    if err != nil {
+        t.Fatalf("submit failed: %v", err)
+    }
+
+    status, err := app.PollUntilDone(jobID)
+    if err != nil {
+        t.Fatalf("poll failed: %v", err)
+    }
+    if status != StatusCompleted {
+        t.Errorf("got status %v, want Completed", status)
+    }
 }
 ```
 
@@ -128,7 +193,7 @@ async fn job_completes_end_to_end() {
 Run tests and confirm they fail for the **right reason**:
 
 ```bash
-cargo test -p <crate> -- <test_name>
+go test ./internal/<package>/...
 ```
 
 **Expected failures:**
@@ -142,21 +207,21 @@ cargo test -p <crate> -- <test_name>
 Write the **simplest code** that makes tests pass:
 
 - Each function: single purpose, < 30 lines
-- Proper `Result<T, E>` returns with domain error types
-- Full type annotations — no `Any` equivalents
+- Proper `error` returns with domain error types
+- Full type annotations
 - No features beyond what tests cover
 
 ## Step 5: Run Tests
 
 ```bash
-# Run all tests for the crate
-cargo test -p <crate>
+# Run all tests for a package
+go test ./internal/<package>/...
 
 # Run specific test
-cargo test -p <crate> -- test_name
+go test ./internal/<package>/... -run TestName
 
-# Run with output
-cargo test -p <crate> -- --nocapture
+# Run with verbose output
+go test ./internal/<package>/... -v
 ```
 
 All tests must pass. If they fail, fix the implementation — do NOT skip tests.
@@ -173,59 +238,69 @@ Improve code while keeping tests green:
 ### Quality Checks (mandatory after refactor)
 
 ```bash
-cargo fmt
-cargo clippy -- -D warnings
-cargo test
+gofmt -w .
+golangci-lint run ./...
+go test ./...
 ```
 
-**Fix all errors — never suppress with `#[allow]`.**
+**Fix all errors — never suppress with `//nolint`.**
 
-## Rust-Specific Test Patterns
+## Go-Specific Test Patterns
 
-### Builder Pattern for Test Data
+### Test Helpers
 
-```rust
-#[cfg(test)]
-struct TestJobBuilder {
-    executor: String,
-    timeout: Option<Duration>,
-}
-
-#[cfg(test)]
-impl TestJobBuilder {
-    fn new() -> Self {
-        Self {
-            executor: "python".into(),
-            timeout: None,
-        }
+```go
+func newTestJob(t *testing.T, executor string) SubmitRequest {
+    t.Helper()
+    return SubmitRequest{
+        Executor: executor,
+        Timeout:  5 * time.Second,
     }
-    fn executor(mut self, e: &str) -> Self { self.executor = e.into(); self }
-    fn timeout(mut self, t: Duration) -> Self { self.timeout = Some(t); self }
-    fn build(self) -> SubmitRequest { /* ... */ }
 }
 ```
 
-### Testing Error Variants
+### Testing Error Types
 
-```rust
-#[test]
-fn rejects_invalid_input() {
-    let result = parse_config("bad data");
-    assert!(matches!(result, Err(ConfigError::ParseFailed { .. })));
-}
-```
+```go
+func TestRejectsInvalidInput(t *testing.T) {
+    _, err := parseConfig("bad data")
 
-### Testing with Traits (Dependency Injection)
-
-```rust
-#[cfg(test)]
-struct MockAgentPool;
-
-#[cfg(test)]
-impl AgentPool for MockAgentPool {
-    async fn acquire(&self) -> Result<AgentHandle, PoolError> {
-        Ok(AgentHandle::fake())
+    var configErr *ConfigError
+    if !errors.As(err, &configErr) {
+        t.Fatalf("got %T, want *ConfigError", err)
     }
+    if configErr.Op != "parse" {
+        t.Errorf("got op %q, want %q", configErr.Op, "parse")
+    }
+}
+```
+
+### Testing with Interfaces (Dependency Injection)
+
+```go
+type mockAgentPool struct{}
+
+func (m *mockAgentPool) Acquire(ctx context.Context) (AgentHandle, error) {
+    return AgentHandle{ID: "fake-agent"}, nil
+}
+
+func TestSchedulerWithMockPool(t *testing.T) {
+    sched := NewJobScheduler(&mockAgentPool{})
+    // ...
+}
+```
+
+### Cleanup with t.Cleanup
+
+```go
+func TestWithTempFile(t *testing.T) {
+    f, err := os.CreateTemp("", "test-*")
+    if err != nil {
+        t.Fatal(err)
+    }
+    t.Cleanup(func() { os.Remove(f.Name()) })
+
+    // use f...
 }
 ```
 
@@ -248,16 +323,16 @@ impl AgentPool for MockAgentPool {
 - **Correct:** Write test → Run (fail) → Implement → Run (pass)
 
 ### 5. Suppressing Quality Errors
-- **Wrong:** Add `#[allow(unused)]` or `#[allow(clippy::...)]`
+- **Wrong:** Add `//nolint` directives
 - **Correct:** Fix root cause
 
 ## Summary
 
 1. **Define scenarios** — success + error cases
-2. **Write failing tests** — `#[test]` / `#[tokio::test]`
-3. **Verify failure** — `cargo test` red
+2. **Write failing tests** — `func TestXxx(t *testing.T)`
+3. **Verify failure** — `go test` red
 4. **Implement minimum** — typed, explicit errors
-5. **Pass tests** — `cargo test` green
-6. **Refactor** — `cargo fmt` + `cargo clippy` + keep green
+5. **Pass tests** — `go test` green
+6. **Refactor** — `gofmt` + `golangci-lint` + keep green
 
 **Remember: Red → Green → Refactor → Repeat**

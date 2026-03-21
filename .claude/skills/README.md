@@ -8,7 +8,7 @@ Skills provide focused guides for AI agents. Invoke with `/skill-name`.
 
 | Skill | Purpose | Use When |
 |-------|---------|----------|
-| `/rust-guide` | Rust coding conventions, error handling, type design, async | Writing or reviewing Rust code |
+| `/go-guide` | Go coding conventions, error handling, type design, concurrency | Writing or reviewing Go code |
 | `/tdd-guide` | TDD workflow (Red → Green → Refactor) | Implementing features or fixing bugs |
 | `/submit` | Quality checks, learning notes, commit, PR creation | Ready to submit changes |
 
@@ -17,7 +17,7 @@ Skills provide focused guides for AI agents. Invoke with `/skill-name`.
 | Skill | Purpose | Use When |
 |-------|---------|----------|
 | `/create-issue` | Create GitHub issue (bug, feature, task) | Planning new work or reporting bugs |
-| `/analyze` | Trace errors/symptoms through the codebase | Debugging errors, panic backtraces, unexpected behavior |
+| `/analyze` | Trace errors/symptoms through the codebase | Debugging errors, panic traces, unexpected behavior |
 
 ### Automation
 
@@ -34,7 +34,7 @@ Skills provide focused guides for AI agents. Invoke with `/skill-name`.
               ┌─────────────────────────────────────────────────────────┐
               │  /create-issue → plan → /tdd-guide → review → /submit  │
 instruction ──→       ↑            ↑         ↑          ↑        ↑     │──→ PR
-              │    trigger     approve    trigger    /rust-guide trigger │
+              │    trigger     approve    trigger    /go-guide  trigger │
               └─────────────────────────────────────────────────────────┘
   autopilot: auto-proceed (stops only at plan approval)
   pilot:     stops at every phase, user says "next"

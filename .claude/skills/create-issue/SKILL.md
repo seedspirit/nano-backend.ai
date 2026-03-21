@@ -141,7 +141,7 @@ Reference specific files/functions. Otherwise "TBD — needs investigation".>
 2. ...
 
 ### Affected Code
-- `crates/...` — <brief description of what this file does in the bug path>
+- `internal/...` or `cmd/...` — <brief description of what this file does in the bug path>
 
 ### Fix Direction
 <If known: outline the approach (not full implementation).

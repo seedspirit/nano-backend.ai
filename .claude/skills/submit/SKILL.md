@@ -37,14 +37,14 @@ Post-implementation submission pipeline: quality enforcement, learning notes, co
 
 **Mandatory — never skip. Must complete before quality checks.**
 
-1. **Inventory test scenarios**: List all tests in changed crates. For each public function or endpoint, confirm both success and failure scenarios exist.
+1. **Inventory test scenarios**: List all tests in changed packages. For each public function or endpoint, confirm both success and failure scenarios exist.
 
    ```
    ## Test Coverage Report
-   ### <crate>::<module>
-   - ✅ success: <description>
-   - ✅ error: <description>
-   - ❌ missing: <what's not tested>
+   ### <package>::<file>
+   - ok: <description>
+   - ok: <description>
+   - missing: <what's not tested>
    ```
 
 2. **Write missing tests**: If any public function lacks a success or failure scenario, write them now.
@@ -54,7 +54,7 @@ Post-implementation submission pipeline: quality enforcement, learning notes, co
 
 3. **Run tests and verify**:
    ```bash
-   cargo test -- --nocapture 2>&1  # see all output
+   go test ./... -v 2>&1  # see all output
    ```
    - All tests must pass
    - Both success and failure paths must be exercised
@@ -67,13 +67,13 @@ Post-implementation submission pipeline: quality enforcement, learning notes, co
 Run sequentially, stop on first failure:
 
 ```bash
-cargo fmt --check
-cargo clippy -- -D warnings
-cargo test
+gofmt -l .
+golangci-lint run ./...
+go test ./...
 ```
 
-- If `fmt` needs changes, run `cargo fmt` and stage results
-- If `clippy` fails, fix the issues and re-run
+- If `gofmt` reports files, run `gofmt -w .` and stage results
+- If `golangci-lint` fails, fix the issues and re-run
 - If tests fail, fix and re-run
 - **All three must pass before continuing**
 
@@ -90,7 +90,7 @@ docs/learn/NNNN-<slug>/
 ├── README.md              # Always created — PR summary and category index
 ├── code-design.md         # Code design learnings (if applicable)
 ├── cs.md                  # CS concepts (if applicable)
-├── rust.md                # Rust programming (if applicable)
+├── go.md                  # Go programming (if applicable)
 └── backend-ai.md          # Backend.AI architecture (if applicable)
 ```
 
@@ -110,7 +110,7 @@ Date: YYYY-MM-DD
 
 - [Code Design](./code-design.md) — only link if file exists
 - [CS](./cs.md)
-- [Rust Programming](./rust.md)
+- [Go Programming](./go.md)
 - [Backend.AI Architecture](./backend-ai.md)
 
 ## Key decisions
@@ -153,12 +153,12 @@ Data structures, algorithms, networking, OS, concurrency, protocols — language
 ...
 ```
 
-#### rust.md — Rust Programming
+#### go.md — Go Programming
 
-Rust syntax, ownership/borrowing, traits, macros, async/await, crate usage — Rust-specific knowledge.
+Go syntax, goroutines, channels, interfaces, error handling, package design — Go-specific knowledge.
 
 ```markdown
-# Rust Programming
+# Go Programming
 
 ## <Topic 1>
 <Explanation, code examples, official doc links>
@@ -189,7 +189,7 @@ Backend.AI's Manager/Agent/Storage structure, session lifecycle, API design, dom
 - Link to relevant source files, docs, or external references
 - The "Further study" checklist in README.md should be actionable — specific topics, not vague
 - **Skip empty categories** — do not create files for categories with no learnings in this PR, and remove them from the Categories list in README.md
-- Present the draft to the user for review before committing
+- Do NOT ask the user to review the learning notes — proceed directly to commit
 
 ### Phase 5: Commit
 
@@ -228,8 +228,8 @@ Backend.AI's Manager/Agent/Storage structure, session lifecycle, API design, dom
    **Approach**: <Why this approach? Key design choice and reasoning.>
 
    ### Changes
-   - `crate/module/file` — <what changed and why>
-   - `crate/module/file` — <what changed and why>
+   - `pkg/module/file` — <what changed and why>
+   - `pkg/module/file` — <what changed and why>
 
    ### Key Decisions
    | Decision | Why |
@@ -255,8 +255,8 @@ Backend.AI's Manager/Agent/Storage structure, session lifecycle, API design, dom
    <Why this change? What problem or need does it address?>
 
    ## Changes
-   - `crate/module/file` — <what changed and why>
-   - `crate/module/file` — <what changed and why>
+   - `pkg/module/file` — <what changed and why>
+   - `pkg/module/file` — <what changed and why>
 
    ### Key Decisions
    | Decision | Why |
@@ -288,7 +288,7 @@ Submission Complete
   Branch:    {branch_name}
   Learn doc: docs/learn/NNNN-<slug>/
 
-Quality: All passed (fmt, clippy, test)
+Quality: All passed (fmt, lint, test)
 Commits: {count} commit(s)
 ```
 

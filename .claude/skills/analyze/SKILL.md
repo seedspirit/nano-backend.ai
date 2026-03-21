@@ -14,7 +14,7 @@ Accepts various forms of error/symptom reports:
 
 | Input Type | Handling |
 |------------|----------|
-| **Error logs / panic output** | Extract file paths, function names, and error types from stack traces and `RUST_BACKTRACE` output |
+| **Error logs / panic output** | Extract file paths, function names, and error types from stack traces and goroutine dumps |
 | **Plain symptom description** | Identify keywords, then ask follow-up questions for environment and reproduction steps |
 | **Screenshots / images** | Read the image via the Read tool, interpret error messages and UI state on screen |
 | **Log file paths** | Read the file and extract relevant error/warning spans (`tracing` output) |
@@ -27,8 +27,8 @@ If information is insufficient, ask the user follow-up questions. **Ask at most 
 
 Extract the following from the input:
 - **Symptoms**: The problem observed by the user
-- **Error messages / logs**: panic backtrace, `tracing` spans, HTTP status, gRPC error codes
-- **Environment info**: OS, Rust toolchain version, configuration
+- **Error messages / logs**: panic/goroutine dumps, `slog` output, HTTP status, gRPC error codes
+- **Environment info**: OS, Go version, configuration
 - **Reproduction steps**: if available
 
 ### 2. Code Tracing
@@ -40,12 +40,12 @@ Explore the codebase to trace the cause of the error.
 
 | Component | Crate / Path |
 |-----------|-------------|
-| Manager | `crates/manager/` |
-| Agent | `crates/agent/` |
-| Common/Shared | `crates/common/` |
-| Database | migrations, `sqlx` queries |
-| Redis | Valkey/Glide client code |
-| gRPC | `.proto` definitions, `tonic` service impls |
+| Manager | `cmd/manager/`, `internal/manager/` |
+| Agent | `cmd/agent/`, `internal/agent/` |
+| Common/Shared | `internal/common/` |
+| Database | migrations, `database/sql` + `pgx` queries |
+| Redis | `go-redis` client code |
+| gRPC | `.proto` definitions, gRPC service impls |
 
 ### 3. Verdict and Report
 
