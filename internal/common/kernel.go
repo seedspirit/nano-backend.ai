@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -10,17 +11,54 @@ import (
 
 // ── Types ──────────────────────────────────────────────
 
-// KernelID is a unique identifier for a kernel instance.
-type KernelID string
+// KernelID is a UUID-based unique identifier for a kernel instance.
+// The zero value is invalid; use NewKernelID or ParseKernelID to construct.
+type KernelID struct {
+	uuid uuid.UUID
+}
 
 // NewKernelID generates a new random KernelID.
 func NewKernelID() KernelID {
-	return KernelID(uuid.New().String())
+	return KernelID{uuid: uuid.New()}
 }
 
-// String returns the string representation of a KernelID.
+// ParseKernelID parses a string into a KernelID.
+// Returns ErrInvalidKernelID if the string is not a valid UUID.
+func ParseKernelID(s string) (KernelID, error) {
+	id, err := uuid.Parse(s)
+	if err != nil {
+		return KernelID{}, ErrInvalidKernelID
+	}
+	return KernelID{uuid: id}, nil
+}
+
+// String returns the UUID string representation.
 func (id KernelID) String() string {
-	return string(id)
+	return id.uuid.String()
+}
+
+// IsZero reports whether the KernelID is the zero value (uninitialized).
+func (id KernelID) IsZero() bool {
+	return id.uuid == uuid.Nil
+}
+
+// MarshalJSON implements json.Marshaler.
+func (id KernelID) MarshalJSON() ([]byte, error) {
+	return json.Marshal(id.uuid.String())
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (id *KernelID) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	parsed, err := uuid.Parse(s)
+	if err != nil {
+		return ErrInvalidKernelID
+	}
+	id.uuid = parsed
+	return nil
 }
 
 // KernelSpec describes how to create a new kernel.
@@ -71,6 +109,8 @@ var (
 	ErrKernelAlreadyExists = errors.New("kernel already exists")
 	// ErrKernelRuntime indicates a runtime error in kernel operations.
 	ErrKernelRuntime = errors.New("kernel runtime error")
+	// ErrInvalidKernelID indicates the string is not a valid UUID.
+	ErrInvalidKernelID = errors.New("invalid kernel ID: must be a valid UUID")
 )
 
 // KernelError provides context for kernel operation failures.
@@ -81,7 +121,7 @@ type KernelError struct {
 }
 
 func (e *KernelError) Error() string {
-	if e.ID != "" {
+	if !e.ID.IsZero() {
 		return fmt.Sprintf("kernel %s %s: %v", e.Op, e.ID, e.Err)
 	}
 	return fmt.Sprintf("kernel %s: %v", e.Op, e.Err)
