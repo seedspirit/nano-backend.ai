@@ -16,9 +16,9 @@ See `README.md` for project overview, architecture, and tech stack.
 
 ## Language & Conventions
 
-- Rust (latest stable), async runtime: Tokio
-- Format: `cargo fmt` — all code must pass before commit
-- Lint: `cargo clippy -- -D warnings` — treat all warnings as errors
+- Go (latest stable)
+- Format: `gofmt` — all code must pass before commit
+- Lint: `golangci-lint run ./...` — treat all warnings as errors
 - Write English comments; Korean is acceptable in design docs under `docs/`
 
 ## Branch Naming
@@ -40,23 +40,23 @@ No unstructured text in API responses. Long-running operations return a pollable
 
 ## Dependency Rules
 
-- No circular dependencies between crates
-- Explicit `pub` boundaries — expose only what is needed
-- Internal crate communication via defined interfaces, not reaching into internals
+- No circular dependencies between packages
+- Minimal exported API — expose only what is needed
+- Internal package communication via defined interfaces, not reaching into internals
 
 ## Test Principles
 
-- Unit tests: `#[cfg(test)] mod tests` alongside source
-- Integration tests: top-level `tests/` directory
+- Unit tests: `_test.go` files alongside source
+- Integration tests: top-level `tests/` directory or build-tagged files
 - Every public function must have both **success** and **error/edge** test scenarios
 - All tests must pass before PR submission — no exceptions
 
 ## Prohibitions
 
-- No `.unwrap()` / `.expect()` in production code — use `Result` or `?`
+- No `panic()` in library code — return `error` values
+- No `os.Exit()` outside `main()`
+- No `fmt.Println` for logging — use `log/slog`
 - No `unsafe` without a comment justifying why it is necessary
-- No panicking in library code
-- No `println!` for logging — use `tracing` crate
 
 ## Work Decomposition
 
@@ -97,6 +97,6 @@ Split a Story further if any of the following apply:
 
 Invoke with `/skill-name`. See `.claude/skills/README.md` for details.
 
-Development: `/rust-guide`, `/tdd-guide`, `/submit`
+Development: `/go-guide`, `/tdd-guide`, `/submit`
 Issues: `/create-issue`, `/analyze`
 Automation: `/autopilot`, `/pilot`, `/spawn-worker`

@@ -46,12 +46,11 @@ Human users interact through a `/v1/chat/completions`-compatible conversational 
 
 ## Tech Stack
 
-- **Language:** Rust
-- **Async runtime:** Tokio
-- **External API:** HTTP + JSON REST
+- **Language:** Go
+- **External API:** HTTP + JSON REST (net/http + chi)
 - **Internal API:** gRPC
 - **Database:** PostgreSQL
-- **Cache / Coordination:** Redis (Valkey Glide client)
+- **Cache / Coordination:** Redis
 
 ## Non-Goals (v0)
 
@@ -61,8 +60,10 @@ Multi-tenancy · Auth · GPU scheduling · Image build pipeline · Advanced prox
 
 ```
 ├── CLAUDE.md          # AI agent guidelines (root-level principles)
+├── cmd/               # Binary entry points (manager, agent)
+├── internal/          # Private packages (common, manager, agent)
 ├── docs/design/       # Detailed design documents
-└── <crates>           # Rust workspace (TBD)
+└── Makefile           # Build, test, lint, fmt targets
 ```
 
 ## License
