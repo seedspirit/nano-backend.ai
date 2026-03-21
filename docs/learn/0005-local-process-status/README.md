@@ -1,6 +1,6 @@
 # LocalProcess 런타임 — status 조회
 
-PR: pending
+PR: #47
 Date: 2026-03-21
 
 ## What was done
