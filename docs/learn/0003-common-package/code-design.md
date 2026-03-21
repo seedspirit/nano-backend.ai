@@ -121,4 +121,4 @@ func Failed(reason string) KernelStatus { return KernelStatus{Type: StatusFailed
 - JSON 직렬화 시 `omitempty`로 불필요한 필드 생략
 
 **Rust와의 차이:**
-Rust의 `enum KernelStatus { Running, Exited(i32), Failed(String) }`은 각 variant가 다른 데이터를 가질 수 있다. Go에서는 struct + iota + 팩토리 함수로 이를 근사한다.
+Rust의 `enum KernelStatus { Running, Exited(i32), Failed(String) }`은 각 variant가 다른 데이터를 가질 수 있다. Go에서는 string named type + struct + 팩토리 함수로 이를 근사한다. `KernelStatusType`을 string으로 정의하여 JSON에서도 `"running"`, `"exited"` 등 사람이 읽을 수 있는 값으로 직렬화된다.

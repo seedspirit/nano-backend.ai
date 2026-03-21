@@ -67,15 +67,12 @@ type KernelSpec struct {
 }
 
 // KernelStatusType represents the kind of kernel status.
-type KernelStatusType int
+type KernelStatusType string
 
 const (
-	// StatusRunning indicates the kernel is currently running.
-	StatusRunning KernelStatusType = iota
-	// StatusExited indicates the kernel exited with a code.
-	StatusExited
-	// StatusFailed indicates the kernel failed with a reason.
-	StatusFailed
+	StatusRunning KernelStatusType = "running"
+	StatusExited  KernelStatusType = "exited"
+	StatusFailed  KernelStatusType = "failed"
 )
 
 // KernelStatus represents the current status of a kernel.

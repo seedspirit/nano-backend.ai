@@ -37,30 +37,47 @@ func (id KernelID) String() string { return id.uuid.String() }
 
 참고: `internal/common/kernel.go:16-62`
 
-## iota를 사용한 열거형 패턴
+## String Named Type을 사용한 열거형 패턴
 
-Go에는 `enum` 키워드가 없다. 대신 `const` 블록에서 `iota`를 사용한다.
+Go에는 `enum` 키워드가 없다. 열거형을 표현하는 대표적인 방법이 두 가지 있다.
+
+### 방법 1: `iota` (정수 기반)
 
 ```go
-type KernelStatusType int
-
+type Status int
 const (
-    StatusRunning KernelStatusType = iota // 0
-    StatusExited                          // 1
-    StatusFailed                          // 2
+    StatusRunning Status = iota // 0
+    StatusExited                // 1
 )
 ```
 
-**iota 동작:**
-- `const` 블록 내에서 0부터 시작, 줄마다 1씩 증가
-- 첫 상수에만 타입과 `iota`를 명시하면 나머지는 자동 적용
+- 간결하지만 JSON에 `0`, `1` 같은 정수가 출력됨
+- 문자열 표현이 필요하면 `go generate` + `stringer` 도구 필요
+- zero value(`0`)가 첫 상수와 겹쳐 미초기화 상태를 구분하기 어려움
 
-**주의점:**
-- zero value가 `0`이므로 `StatusRunning`이 기본값이 됨 — 초기화되지 않은 상태가 Running으로 해석될 수 있음
-- 이를 피하려면 `StatusUnknown = iota`를 0번에 두는 패턴도 있음
-- JSON 직렬화 시 정수로 표현됨 — 문자열이 필요하면 `go generate` + `stringer` 사용
+### 방법 2: String named type (채택)
 
-참고: `internal/common/kernel.go:70-80`
+```go
+type KernelStatusType string
+
+const (
+    StatusRunning KernelStatusType = "running"
+    StatusExited  KernelStatusType = "exited"
+    StatusFailed  KernelStatusType = "failed"
+)
+```
+
+**장점:**
+- JSON에 `"running"`, `"exited"` 같은 읽기 쉬운 문자열 출력 — 별도 마샬링 불필요
+- 로그/디버깅 시 값 자체가 의미를 가짐
+- zero value가 `""`(빈 문자열)이므로 유효한 상태와 명확히 구분됨
+- `stringer` 같은 코드 생성 도구가 불필요
+
+**트레이드오프:**
+- 문자열 비교는 정수 비교보다 느리지만, 상태값 수가 적으므로 무시 가능
+- 타입 캐스팅(`KernelStatusType("unknown")`)으로 잘못된 값 생성 가능 — 필요 시 검증 함수 추가
+
+참고: `internal/common/kernel.go:69-76`
 
 ## Sentinel Error 패턴
 

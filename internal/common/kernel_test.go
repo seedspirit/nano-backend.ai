@@ -153,7 +153,7 @@ func TestKernelStatusRunningRoundtrip(t *testing.T) {
 	}
 
 	if decoded.Type != StatusRunning {
-		t.Errorf("got type %d, want %d (StatusRunning)", decoded.Type, StatusRunning)
+		t.Errorf("got type %q, want %q", decoded.Type, StatusRunning)
 	}
 }
 
@@ -171,7 +171,7 @@ func TestKernelStatusExitedRoundtrip(t *testing.T) {
 	}
 
 	if decoded.Type != StatusExited {
-		t.Errorf("got type %d, want %d (StatusExited)", decoded.Type, StatusExited)
+		t.Errorf("got type %q, want %q", decoded.Type, StatusExited)
 	}
 	if decoded.Code != 42 {
 		t.Errorf("got code %d, want 42", decoded.Code)
@@ -192,7 +192,7 @@ func TestKernelStatusFailedRoundtrip(t *testing.T) {
 	}
 
 	if decoded.Type != StatusFailed {
-		t.Errorf("got type %d, want %d (StatusFailed)", decoded.Type, StatusFailed)
+		t.Errorf("got type %q, want %q", decoded.Type, StatusFailed)
 	}
 	if decoded.Reason != "out of memory" {
 		t.Errorf("got reason %q, want %q", decoded.Reason, "out of memory")
