@@ -1,3 +1,5 @@
+version: "2"
+
 run:
   timeout: 5m
 
@@ -7,28 +9,26 @@ linters:
     - govet
     - staticcheck
     - unused
-    - gosimple
     - ineffassign
-    - typecheck
     - gocritic
-    - gofmt
     - revive
+  settings:
+    errcheck:
+      check-type-assertions: true
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+    revive:
+      rules:
+        - name: exported
+          arguments:
+            - "checkPrivateReceivers"
+  exclusions:
+    presets:
+      - std-error-handling
 
-linters-settings:
-  errcheck:
-    check-type-assertions: true
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - style
-      - performance
-  revive:
-    rules:
-      - name: exported
-        arguments:
-          - "checkPrivateReceivers"
-
-issues:
-  exclude-use-default: false
-  max-issues-per-linter: 0
-  max-same-issues: 0
+formatters:
+  enable:
+    - gofmt
