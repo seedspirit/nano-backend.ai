@@ -47,7 +47,7 @@ Reference user needs, architecture gaps, or upstream requirements.>
 
 ### Context
 <Current state of the codebase relevant to this Epic.
-Which crates/modules are involved? What exists today vs. what needs to change?
+Which packages/modules are involved? What exists today vs. what needs to change?
 Link to design docs if available (e.g., `docs/design/xxx.md`).>
 
 ### Stories
@@ -99,8 +99,8 @@ How does it fit into the parent Epic's goal?>
 - [ ] <condition> (max 3 — split if more)
 
 ### Affected Code
-<Which crates, modules, or files will be created/modified?
-e.g., `crates/common/src/response.rs`, `crates/manager/src/routes/`>
+<Which packages, modules, or files will be created/modified?
+e.g., `internal/common/response.go`, `cmd/manager/routes/`>
 
 ### Design Notes
 <Key design choices for this Story: traits to define/implement, error types, API shape.
@@ -141,7 +141,7 @@ Reference specific files/functions. Otherwise "TBD — needs investigation".>
 2. ...
 
 ### Affected Code
-- `crates/...` — <brief description of what this file does in the bug path>
+- `internal/...` or `cmd/...` — <brief description of what this file does in the bug path>
 
 ### Fix Direction
 <If known: outline the approach (not full implementation).
@@ -172,7 +172,7 @@ Link to parent issue or Epic if applicable.>
 - [ ] <criterion>
 
 ### Affected Code
-<Which crates/modules/files will be created or changed?>
+<Which packages/modules/files will be created or changed?>
 
 ### Design Notes
 <Approach, relevant patterns, constraints. Link to existing code or docs.>
@@ -188,7 +188,7 @@ Before presenting the draft, verify every issue body meets these criteria:
 
 - **Self-contained**: A reader (human or AI agent) can understand the issue without opening other tabs. If the issue references external context, summarize it inline rather than just linking.
 - **"Why" before "What"**: Background/Motivation section explains the reason this issue exists. Never skip it.
-- **Affected Code is concrete**: List actual crate/module/file paths, not vague references like "the code" or "relevant modules".
+- **Affected Code is concrete**: List actual package/module/file paths, not vague references like "the code" or "relevant modules".
 - **Test Plan is scenario-based**: Each item describes what is being verified (e.g., "Unit test: empty input returns ValidationError"), not just "add tests".
 - **ACs are observable**: Each criterion can be checked by running a command or reading an output. Avoid subjective criteria like "clean code" or "well-structured".
 - **No placeholder text**: Every `<angle-bracket placeholder>` in the template must be replaced with real content. If a section genuinely does not apply, remove it rather than leaving a placeholder.

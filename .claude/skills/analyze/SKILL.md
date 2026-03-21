@@ -14,10 +14,10 @@ Accepts various forms of error/symptom reports:
 
 | Input Type | Handling |
 |------------|----------|
-| **Error logs / panic output** | Extract file paths, function names, and error types from stack traces and `RUST_BACKTRACE` output |
+| **Error logs / panic output** | Extract file paths, function names, and error types from stack traces and goroutine dumps |
 | **Plain symptom description** | Identify keywords, then ask follow-up questions for environment and reproduction steps |
 | **Screenshots / images** | Read the image via the Read tool, interpret error messages and UI state on screen |
-| **Log file paths** | Read the file and extract relevant error/warning spans (`tracing` output) |
+| **Log file paths** | Read the file and extract relevant error/warning log records (`slog` output) |
 
 If information is insufficient, ask the user follow-up questions. **Ask at most 2 rounds** of questions — if still insufficient, proceed with the available information.
 
@@ -27,8 +27,8 @@ If information is insufficient, ask the user follow-up questions. **Ask at most 
 
 Extract the following from the input:
 - **Symptoms**: The problem observed by the user
-- **Error messages / logs**: panic backtrace, `tracing` spans, HTTP status, gRPC error codes
-- **Environment info**: OS, Rust toolchain version, configuration
+- **Error messages / logs**: panic/goroutine dumps, `slog` output, HTTP status, gRPC error codes
+- **Environment info**: OS, Go version, configuration
 - **Reproduction steps**: if available
 
 ### 2. Code Tracing
@@ -38,14 +38,14 @@ Explore the codebase to trace the cause of the error.
 - Follow the code flow to estimate the root cause
 - Identify affected components:
 
-| Component | Crate / Path |
+| Component | Package / Path |
 |-----------|-------------|
-| Manager | `crates/manager/` |
-| Agent | `crates/agent/` |
-| Common/Shared | `crates/common/` |
-| Database | migrations, `sqlx` queries |
-| Redis | Valkey/Glide client code |
-| gRPC | `.proto` definitions, `tonic` service impls |
+| Manager | `cmd/manager/`, `internal/manager/` |
+| Agent | `cmd/agent/`, `internal/agent/` |
+| Common/Shared | `internal/common/` |
+| Database | migrations (`goose`), `jmoiron/sqlx` queries |
+| Redis/Valkey | `github.com/valkey-io/valkey-glide/go/v2` client code |
+| gRPC | `.proto` definitions, gRPC service impls |
 
 ### 3. Verdict and Report
 
@@ -60,7 +60,7 @@ Output templates differ by classification:
 - **Component**: manager / agent / common / ...
 - **Severity**: Highest / High / Medium / Low
 - **Cause Summary**: ...
-- **Related Code**: `crates/manager/src/...`
+- **Related Code**: `cmd/manager/`, `internal/manager/`, etc.
 - **Fix Direction**: ...
 ```
 
@@ -83,7 +83,7 @@ Severity criteria:
 - **Classification**: Expected Behavior
 - **Component**: manager / agent / common / ...
 - **Cause Summary**: ...
-- **Related Code**: `crates/manager/src/...`
+- **Related Code**: `cmd/manager/`, `internal/manager/`, etc.
 - **Correct Usage**: ...
 ```
 

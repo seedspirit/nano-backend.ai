@@ -86,8 +86,8 @@ Performed directly by the spawn-worker skill (outside the loop, in the main Clau
 ### <Feature Area 2>
 - [ ] <scenario>
 ### Common
-- [ ] `cargo test` passes for affected crates
-- [ ] `cargo clippy -- -D warnings` clean
+- [ ] `go test ./...` passes for affected packages
+- [ ] `golangci-lint run ./...` clean
 
 ## Tasks
 - [ ] Task 1: <description>
@@ -100,8 +100,8 @@ Performed directly by the spawn-worker skill (outside the loop, in the main Clau
 **If success criteria are missing from the issue**: generate scenario-level criteria based on the issue content and code analysis.
 
 **Always include as the last criteria**:
-- `cargo test` passes for affected crates
-- `cargo clippy -- -D warnings` clean
+- `go test ./...` passes for affected packages
+- `golangci-lint run ./...` clean
 
 ### 4. User Review Plan
 
@@ -116,8 +116,8 @@ Present plan.md to the user and request approval via `AskUserQuestion`:
 - [ ] agent misses 3 beats → manager marks agent as lost
 - [ ] lost agent reconnects → manager restores status
 #### Common
-- [ ] `cargo test` passes for affected crates
-- [ ] `cargo clippy -- -D warnings` clean
+- [ ] `go test ./...` passes for affected packages
+- [ ] `golangci-lint run ./...` clean
 
 ### Tasks (3 tasks, estimated 3+1 iterations)
 - [ ] Task 1: Implement heartbeat timeout detection in manager

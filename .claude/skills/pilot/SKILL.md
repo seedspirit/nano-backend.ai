@@ -25,7 +25,7 @@ Same 6 phases as `/autopilot`. Each phase triggers the same underlying skill.
 | 2 | Branch | git commands | Branch `issue-<N>` |
 | 3 | Plan | Explore agents | Plan with success criteria |
 | 4 | Implement | `/tdd-guide` | Working code + tests |
-| 5 | Review | `/rust-guide` ref | Clean diff |
+| 5 | Review | `/go-guide` ref | Clean diff |
 | 6 | Submit | `/submit` | PR URL |
 
 ## Dashboard

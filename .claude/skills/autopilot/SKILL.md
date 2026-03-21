@@ -44,8 +44,8 @@ No skill trigger — direct git command.
 ### <Feature Area>
 - [ ] <scenario: input/action → expected result>
 ### Common
-- [ ] cargo test passes
-- [ ] cargo clippy -- -D warnings clean
+- [ ] go test ./... passes
+- [ ] golangci-lint run ./... clean
 
 ## Tasks
 - [ ] Task 1: <description>
@@ -62,24 +62,24 @@ Invoke `Skill("tdd-guide")` for each task from the plan.
 
 For each task:
 1. `/tdd-guide` drives: scenarios → failing tests → implement → refactor
-2. Verify: `cargo test -p <crate>` + `cargo clippy -- -D warnings`
+2. Verify: `go test ./internal/<pkg>/...` + `golangci-lint run ./...`
 
 **Completion signal**: All plan tasks checked off, tests green.
 
-### Phase 5: Test Verification + Self-Review → reference `/rust-guide`
+### Phase 5: Test Verification + Self-Review → reference `/go-guide`
 
-Invoke `Skill("rust-guide")` to load conventions, then:
+Invoke `Skill("go-guide")` to load conventions, then:
 
 #### 5a. Test Coverage Check
 
-1. List all tests in changed crates. For each public function or endpoint, confirm:
+1. List all tests in changed packages. For each public function or endpoint, confirm:
    - **Success scenario** exists (valid input → expected output)
    - **Error/edge scenario** exists (invalid input, boundary → expected error)
 
 2. Report coverage:
-   ```
+   ```markdown
    ## Test Coverage Report
-   ### <crate>::<module>
+   ### <package>::<file>
    - ✅ success: <description>
    - ✅ error: <description>
    - ❌ missing: <what's not tested>
@@ -94,20 +94,20 @@ Invoke `Skill("rust-guide")` to load conventions, then:
 
 | Check | Source |
 |-------|--------|
-| No `.unwrap()` / `.expect()` in prod | CLAUDE.md |
-| `tracing` only, no `println!` | CLAUDE.md |
+| No `panic()` in library code | CLAUDE.md |
+| `log/slog` only, no `fmt.Println` | CLAUDE.md |
 | External endpoints return `ApiResponse` | CLAUDE.md |
 | Every public fn has success + error tests | CLAUDE.md |
-| `thiserror::Error` for error types | /rust-guide |
-| Descriptive naming | /rust-guide |
-| Minimal `pub` boundaries | /rust-guide |
+| Domain error types with `error` interface | /go-guide |
+| Descriptive naming | /go-guide |
+| Minimal exported API | /go-guide |
 
 3. Fix findings immediately
 4. Run quality checks:
    ```bash
-   cargo fmt --check
-   cargo clippy -- -D warnings
-   cargo test
+   gofmt -l .
+   golangci-lint run ./...
+   go test ./...
    ```
 5. Repeat until clean (max 3 iterations). Stop and report if still failing.
 
