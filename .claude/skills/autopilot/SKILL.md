@@ -77,7 +77,7 @@ Invoke `Skill("go-guide")` to load conventions, then:
    - **Error/edge scenario** exists (invalid input, boundary → expected error)
 
 2. Report coverage:
-   ```
+   ```markdown
    ## Test Coverage Report
    ### <package>::<file>
    - ✅ success: <description>

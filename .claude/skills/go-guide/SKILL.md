@@ -169,11 +169,15 @@ func handle(r *Request) {
     process(r)
 }
 
-// Good — graceful shutdown with context
+// Good — graceful shutdown with context, checking channel close
 func serve(ctx context.Context, queue <-chan *Request) {
     for {
         select {
-        case req := <-queue:
+        case req, ok := <-queue:
+            if !ok {
+                slog.Info("queue closed")
+                return
+            }
             go handle(req)
         case <-ctx.Done():
             slog.Info("shutting down")
@@ -369,10 +373,10 @@ Preferred packages:
 | HTTP server | `net/http` (stdlib) or `chi` |
 | Serialization | `encoding/json` (stdlib) |
 | Database | `database/sql` + `pgx` (PostgreSQL) |
-| Redis | `go-redis/redis` |
-| gRPC | `google.golang.org/grpc` + `protobuf` |
+| Redis | `github.com/redis/go-redis/v9` |
+| gRPC | `google.golang.org/grpc` + `google.golang.org/protobuf` |
 | Logging | `log/slog` (stdlib) |
-| Testing | `testing` (stdlib) + `testify` (assertions) |
-| UUID | `google/uuid` |
-| CLI | `cobra` or `urfave/cli` |
-| K8s | `client-go`, `controller-runtime` |
+| Testing | `testing` (stdlib) + `github.com/stretchr/testify` |
+| UUID | `github.com/google/uuid` |
+| CLI | `github.com/spf13/cobra` or `github.com/urfave/cli/v2` |
+| K8s | `k8s.io/client-go`, `sigs.k8s.io/controller-runtime` |
