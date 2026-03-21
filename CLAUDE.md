@@ -16,9 +16,9 @@ See `README.md` for project overview, architecture, and tech stack.
 
 ## Language & Conventions
 
-- Rust (latest stable), async runtime: Tokio
-- Format: `cargo fmt` — all code must pass before commit
-- Lint: `cargo clippy -- -D warnings` — treat all warnings as errors
+- Go (1.22+), concurrency: goroutines + channels
+- Format: `gofmt` — all code must pass before commit
+- Lint: `golangci-lint run ./...` — treat all warnings as errors
 - Write English comments; Korean is acceptable in design docs under `docs/`
 
 ## Branch Naming
@@ -40,23 +40,23 @@ No unstructured text in API responses. Long-running operations return a pollable
 
 ## Dependency Rules
 
-- No circular dependencies between crates
-- Explicit `pub` boundaries — expose only what is needed
-- Internal crate communication via defined interfaces, not reaching into internals
+- No circular dependencies between packages
+- Export only what is needed — unexported by default
+- Internal package communication via defined interfaces, not reaching into internals
 
 ## Test Principles
 
-- Unit tests: `#[cfg(test)] mod tests` alongside source
-- Integration tests: top-level `tests/` directory
+- Unit tests: `*_test.go` files alongside source in same package
+- Integration tests: build tag `//go:build integration`
 - Every public function must have both **success** and **error/edge** test scenarios
 - All tests must pass before PR submission — no exceptions
 
 ## Prohibitions
 
-- No `.unwrap()` / `.expect()` in production code — use `Result` or `?`
-- No `unsafe` without a comment justifying why it is necessary
-- No panicking in library code
-- No `println!` for logging — use `tracing` crate
+- No `panic()` in library code — return `error`
+- No discarding errors with `_` — always handle or propagate
+- No `fmt.Println` / `log.Println` for logging — use `log/slog`
+- No `//nolint` without a comment justifying why it is necessary
 
 ## Work Decomposition
 
@@ -80,8 +80,8 @@ Decompose work into Epic → Story → Task.
 
 Code design must support parallel Story execution:
 
-- **Trait/interface first**: Finalize abstractions in a preceding Story so implementation Stories can proceed in parallel
-- **Enforce behavior via structure**: Use compile-time contracts to prevent integration mismatches
+- **Interface first**: Finalize abstractions in a preceding Story so implementation Stories can proceed in parallel
+- **Enforce behavior via structure**: Use interfaces and type contracts to prevent integration mismatches
 - **Localize modifications**: Design boundaries so changes are contained within a single module
 - **Explicit dependency graph**: When creating an Epic, annotate blocks/blockedBy between Stories to visualize parallelizable segments
 
@@ -97,6 +97,6 @@ Split a Story further if any of the following apply:
 
 Invoke with `/skill-name`. See `.claude/skills/README.md` for details.
 
-Development: `/rust-guide`, `/tdd-guide`, `/submit`
+Development: `/go-guide`, `/tdd-guide`, `/submit`
 Issues: `/create-issue`, `/analyze`
 Automation: `/autopilot`, `/pilot`, `/spawn-worker`
