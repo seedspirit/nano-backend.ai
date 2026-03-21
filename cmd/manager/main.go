@@ -2,7 +2,10 @@ package main
 
 import (
 	"log/slog"
+	"net/http"
 	"os"
+
+	"github.com/seedspirit/nano-backend.ai/internal/manager"
 )
 
 func main() {
@@ -11,5 +14,12 @@ func main() {
 	}))
 	slog.SetDefault(logger)
 
-	slog.Info("manager started")
+	addr := ":8090"
+	router := manager.NewRouter()
+
+	slog.Info("manager starting", "addr", addr)
+	if err := http.ListenAndServe(addr, router); err != nil {
+		slog.Error("server failed", "error", err)
+		os.Exit(1)
+	}
 }
