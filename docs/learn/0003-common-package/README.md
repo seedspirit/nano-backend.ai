@@ -19,8 +19,8 @@ Date: 2026-03-21
 
 | Decision | Why | Alternatives considered |
 |----------|-----|------------------------|
-| `KernelID`를 `type KernelID string` named type으로 정의 | 컴파일 타임에 일반 string과 구별하여 타입 안전성 확보 | raw `string` 사용 — 실수로 다른 ID와 혼용 가능 |
-| UUID 기반 ID 생성 (`google/uuid`) | 분산 환경에서 충돌 없는 고유 식별자 보장 | 순차 정수 — 단일 노드에서만 유효, 분산 환경에서 충돌 |
+| `KernelID`를 unexported `uuid.UUID` 필드를 가진 struct로 정의 | 컴파일 타임에 임의 문자열 대입 차단 — `NewKernelID()` 또는 `ParseKernelID()` 생성자만 허용하여 UUID 포맷 강제 | `type KernelID string` named type — 캐스팅으로 우회 가능, UUID 검증 불가 |
+| UUID v4 기반 ID 생성 (`google/uuid`) | 분산 환경에서 충돌 없는 고유 식별자 보장 | 순차 정수 — 단일 노드에서만 유효, 분산 환경에서 충돌 |
 | `KernelStatus`를 iota enum + struct로 구현 | Go에는 sum type이 없으므로, iota + 관련 필드 struct가 관용적 패턴 | interface 기반 다형성 — Status 같은 단순 값에는 과잉 |
 | Sentinel error + wrapping `KernelError` 조합 | `errors.Is()`로 분류 + `KernelError`로 context(Op, ID) 부가 | 단일 에러 타입에 code 필드 — 패턴 매칭이 불편 |
 | `KernelRuntime`을 `internal/common`에 배치 | Manager도 이 타입을 참조해야 하므로 공유 패키지에 위치 | agent 패키지 내부 — Manager에서 import 시 순환 의존 발생 |

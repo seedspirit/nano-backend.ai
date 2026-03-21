@@ -23,30 +23,47 @@ type KernelRuntime interface {
 
 핵심 원칙: **변하는 축(런타임 종류)만 추상화하고, 변하지 않는 것(Agent 공통 로직)은 concrete로 유지.**
 
-참고: `internal/common/kernel.go:96-103`
+참고: `internal/common/kernel.go:134-143`
 
-## Named Type을 활용한 도메인 모델링
+## Opaque Type 패턴: unexported struct로 불변성 강제
 
-`KernelID`를 `type KernelID string`으로 정의하면 컴파일러가 일반 `string`과 구별해준다.
+`KernelID`를 unexported 필드를 가진 struct로 정의하여, 반드시 생성자를 통해서만 유효한 값을 만들 수 있도록 강제한다.
 
 ```go
-type KernelID string
-type SessionID string
+// unexported 필드 → 외부 패키지에서 직접 생성 불가
+type KernelID struct {
+    uuid uuid.UUID
+}
 
-func DoSomething(kid KernelID, sid SessionID) { ... }
+// 유일한 생성 경로 ① — 새 UUID 발급
+func NewKernelID() KernelID {
+    return KernelID{uuid: uuid.New()}
+}
 
-// 컴파일 에러: cannot use sid (SessionID) as KernelID
-DoSomething(sid, kid)
+// 유일한 생성 경로 ② — 문자열 파싱 (UUID 포맷 검증)
+func ParseKernelID(s string) (KernelID, error) {
+    id, err := uuid.Parse(s)
+    if err != nil {
+        return KernelID{}, ErrInvalidKernelID
+    }
+    return KernelID{uuid: id}, nil
+}
 ```
 
-**이점:**
-- 함수 시그니처만 보고 어떤 ID인지 명확
-- 파라미터 순서 실수를 컴파일 타임에 잡음
-- `String()` 같은 메서드를 해당 타입에만 부여 가능
+**named string(`type KernelID string`)과의 차이:**
+
+| 비교 | `type KernelID string` | `struct { uuid uuid.UUID }` |
+|------|----------------------|---------------------------|
+| 임의 값 대입 | `KernelID("anything")` 가능 | 컴파일 에러 — 외부에서 struct 리터럴 불가 |
+| 포맷 검증 | 없음 — 컨벤션으로만 강제 | `ParseKernelID`에서 UUID 검증 |
+| zero value | `""` (빈 문자열) | `KernelID{}` — `IsZero()`로 명시적 확인 |
+| JSON 직렬화 | 자동 (string) | `MarshalJSON`/`UnmarshalJSON` 직접 구현 필요 |
 
 **트레이드오프:**
-- 현재는 아무 문자열이든 `KernelID("arbitrary")`로 캐스팅 가능 — 생성자(`NewKernelID()`)를 통해서만 만들도록 컨벤션으로 강제
-- 더 엄격한 검증이 필요하면 unexported struct + 생성 함수 패턴으로 전환 가능
+- 같은 패키지 내에서는 `KernelID{uuid: ...}` 직접 생성이 가능 — Go는 패키지 단위 접근 제어이므로 모듈 내부에서는 우회 가능
+- JSON 커스텀 마샬링 코드가 추가로 필요하지만, 역직렬화 시에도 UUID 검증이 적용되는 이점이 있음
+
+참고: `internal/common/kernel.go:16-62`
 
 ## 에러 설계: Sentinel + Wrapping 조합
 
@@ -86,7 +103,7 @@ err.Error() // "kernel status abc-123: kernel not found"
 
 이 패턴은 Rob Pike의 "Errors are values" 철학과 일치: 에러에 구조를 부여하되, 표준 `error` 인터페이스를 준수한다.
 
-참고: `internal/common/kernel.go:67-92`
+참고: `internal/common/kernel.go:103-132`
 
 ## 팩토리 함수 패턴: 상태 생성자
 
