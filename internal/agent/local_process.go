@@ -1,0 +1,119 @@
+package agent
+
+import (
+	"context"
+	"fmt"
+	"os/exec"
+	"sync"
+
+	"github.com/seedspirit/nano-backend.ai/internal/common"
+)
+
+// Compile-time verification that LocalProcess implements KernelRuntime.
+var _ common.KernelRuntime = (*LocalProcess)(nil)
+
+// processEntry tracks a running child process.
+type processEntry struct {
+	cmd  *exec.Cmd
+	done chan struct{} // closed when cmd.Wait() returns
+}
+
+// LocalProcess implements KernelRuntime by managing local OS processes.
+type LocalProcess struct {
+	mu        sync.Mutex
+	processes map[common.KernelID]*processEntry
+}
+
+// NewLocalProcess creates a new LocalProcess runtime.
+func NewLocalProcess() *LocalProcess {
+	return &LocalProcess{
+		processes: make(map[common.KernelID]*processEntry),
+	}
+}
+
+// Create launches a child process described by spec and returns its KernelID.
+func (lp *LocalProcess) Create(_ context.Context, spec common.KernelSpec) (common.KernelID, error) {
+	if len(spec.Command) == 0 {
+		return common.KernelID{}, &common.KernelError{
+			Op:  "create",
+			Err: fmt.Errorf("empty command: %w", common.ErrKernelRuntime),
+		}
+	}
+
+	cmd := exec.Command(spec.Command[0], spec.Command[1:]...) //nolint:gosec // command comes from trusted KernelSpec
+	if err := cmd.Start(); err != nil {
+		return common.KernelID{}, &common.KernelError{
+			Op:  "create",
+			Err: fmt.Errorf("%s: %w", err, common.ErrKernelRuntime),
+		}
+	}
+
+	id := common.NewKernelID()
+	entry := &processEntry{
+		cmd:  cmd,
+		done: make(chan struct{}),
+	}
+
+	// Reap the process in the background to prevent zombies.
+	go func() {
+		_ = cmd.Wait()
+		close(entry.done)
+	}()
+
+	lp.mu.Lock()
+	lp.processes[id] = entry
+	lp.mu.Unlock()
+
+	return id, nil
+}
+
+// Destroy terminates the process identified by id.
+func (lp *LocalProcess) Destroy(_ context.Context, id common.KernelID) error {
+	lp.mu.Lock()
+	entry, ok := lp.processes[id]
+	if !ok {
+		lp.mu.Unlock()
+		return &common.KernelError{
+			Op:  "destroy",
+			ID:  id,
+			Err: common.ErrKernelNotFound,
+		}
+	}
+	delete(lp.processes, id)
+	lp.mu.Unlock()
+
+	if err := entry.cmd.Process.Kill(); err != nil {
+		// Process may have already exited; not an error.
+		select {
+		case <-entry.done:
+			return nil
+		default:
+			return &common.KernelError{
+				Op:  "destroy",
+				ID:  id,
+				Err: fmt.Errorf("%s: %w", err, common.ErrKernelRuntime),
+			}
+		}
+	}
+
+	// Wait for the reaper goroutine to finish.
+	<-entry.done
+	return nil
+}
+
+// Status returns the current status of the process identified by id.
+// Stub — full implementation in a separate Story (#44).
+func (lp *LocalProcess) Status(_ context.Context, id common.KernelID) (common.KernelStatus, error) {
+	lp.mu.Lock()
+	_, ok := lp.processes[id]
+	lp.mu.Unlock()
+
+	if !ok {
+		return common.KernelStatus{}, &common.KernelError{
+			Op:  "status",
+			ID:  id,
+			Err: common.ErrKernelNotFound,
+		}
+	}
+	return common.Running(), nil
+}
