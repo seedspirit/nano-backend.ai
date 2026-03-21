@@ -219,19 +219,41 @@ Label mapping:
 | Feature | `enhancement` |
 | Task | `task` |
 
-When creating an Epic, also create a GitHub Milestone with the same name.
-When creating a Story, link it to the parent Epic's Milestone.
-
 Component labels: `manager`, `agent`, `common`, `infra`
 
 If labels don't exist yet, create without labels and note it.
 
-### 5. Story Decomposition Check (Epic only)
+### 5. Parent–Child Relationship (Sub-Issues)
+
+**All Story/Task issues with a parent Epic MUST be linked as sub-issues.**
+
+Use the GitHub Sub-Issues API to establish the parent–child relationship:
+
+```bash
+# 1. Get the child issue's database ID (not the issue number)
+CHILD_ID=$(gh api repos/{owner}/{repo}/issues/{child_number} --jq '.id')
+
+# 2. Add as sub-issue to the parent Epic
+gh api repos/{owner}/{repo}/issues/{parent_number}/sub_issues \
+  -F sub_issue_id="$CHILD_ID"
+```
+
+Important notes:
+- Use `-F` (not `-f`) so the ID is sent as an integer, not a string
+- The parent issue shows a sub-issues progress tracker automatically
+- This replaces the previous Milestone-based linking approach
+
+When creating a **Story** individually (not as part of Epic decomposition):
+1. Ask for the parent Epic issue number
+2. Create the Story issue
+3. Immediately link it as a sub-issue of the parent Epic
+
+### 6. Story Decomposition Check (Epic only)
 
 After creating the Epic, create its child Stories sequentially:
 
 1. Create each Story as an individual issue (using the Story Template)
-2. Link to the Epic's Milestone
+2. **Link each Story as a sub-issue of the Epic** (Step 5)
 3. Note dependency relationships in the issue body with `blocks: #N` / `blockedBy: #N`
 
 Validate during decomposition:
@@ -240,7 +262,7 @@ Validate during decomposition:
 - Is there a preceding trait/interface Story enabling parallel implementation Stories?
 - Are changes contained within module boundaries?
 
-### 6. Report
+### 7. Report
 
 ```markdown
 ## Issue Created
