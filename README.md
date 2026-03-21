@@ -46,11 +46,11 @@ Human users interact through a `/v1/chat/completions`-compatible conversational 
 
 ## Tech Stack
 
-- **Language:** Go (1.22+)
+- **Language:** Go (1.25+)
 - **External API:** HTTP + JSON REST (net/http)
 - **Internal API:** gRPC (google.golang.org/grpc)
-- **Database:** PostgreSQL (pgx)
-- **Cache / Coordination:** Redis (go-redis)
+- **Database:** PostgreSQL (sqlx + pgx)
+- **Cache / Coordination:** Valkey (valkey-glide)
 - **Logging:** log/slog (stdlib)
 
 ## Non-Goals (v0)

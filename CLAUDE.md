@@ -16,7 +16,7 @@ See `README.md` for project overview, architecture, and tech stack.
 
 ## Language & Conventions
 
-- Go (1.22+), concurrency: goroutines + channels
+- Go (1.25+), concurrency: goroutines + channels
 - Format: `gofmt` — all code must pass before commit
 - Lint: `golangci-lint run ./...` — treat all warnings as errors
 - Write English comments; Korean is acceptable in design docs under `docs/`
