@@ -11,7 +11,7 @@ import (
 
 func TestHealthReturns200OK(t *testing.T) {
 	router := NewRouter()
-	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	req := httptest.NewRequest(http.MethodGet, "/health", http.NoBody)
 	rec := httptest.NewRecorder()
 
 	router.ServeHTTP(rec, req)
@@ -35,7 +35,7 @@ func TestHealthReturns200OK(t *testing.T) {
 
 func TestUnknownRouteReturns404(t *testing.T) {
 	router := NewRouter()
-	req := httptest.NewRequest(http.MethodGet, "/nonexistent", nil)
+	req := httptest.NewRequest(http.MethodGet, "/nonexistent", http.NoBody)
 	rec := httptest.NewRecorder()
 
 	router.ServeHTTP(rec, req)
@@ -47,7 +47,7 @@ func TestUnknownRouteReturns404(t *testing.T) {
 
 func TestHealthResponseContentType(t *testing.T) {
 	router := NewRouter()
-	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	req := httptest.NewRequest(http.MethodGet, "/health", http.NoBody)
 	rec := httptest.NewRecorder()
 
 	router.ServeHTTP(rec, req)

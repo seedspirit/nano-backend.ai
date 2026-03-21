@@ -69,6 +69,7 @@ type KernelSpec struct {
 // KernelStatusType represents the kind of kernel status.
 type KernelStatusType string
 
+// Kernel status constants.
 const (
 	StatusRunning KernelStatusType = "running"
 	StatusExited  KernelStatusType = "exited"
