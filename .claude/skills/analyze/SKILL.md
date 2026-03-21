@@ -43,8 +43,8 @@ Explore the codebase to trace the cause of the error.
 | Manager | `cmd/manager/`, `internal/manager/` |
 | Agent | `cmd/agent/`, `internal/agent/` |
 | Common/Shared | `internal/common/` |
-| Database | migrations, `database/sql` + `pgx` queries |
-| Redis | `go-redis` client code |
+| Database | migrations (`goose`), `jmoiron/sqlx` queries |
+| Redis/Valkey | `valkey-io/valkey-glide-go` client code |
 | gRPC | `.proto` definitions, gRPC service impls |
 
 ### 3. Verdict and Report

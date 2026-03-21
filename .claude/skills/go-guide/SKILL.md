@@ -372,8 +372,9 @@ Preferred packages:
 |---------|---------|
 | HTTP server | `net/http` (stdlib) or `chi` |
 | Serialization | `encoding/json` (stdlib) |
-| Database | `database/sql` + `pgx` (PostgreSQL) |
-| Redis | `github.com/redis/go-redis/v9` |
+| Database | `github.com/jmoiron/sqlx` + `github.com/jackc/pgx/v5` (PostgreSQL) |
+| Migrations | `github.com/pressly/goose/v3` |
+| Redis/Valkey | `github.com/valkey-io/valkey-glide/go` |
 | gRPC | `google.golang.org/grpc` + `google.golang.org/protobuf` |
 | Logging | `log/slog` (stdlib) |
 | Testing | `testing` (stdlib) + `github.com/stretchr/testify` |
