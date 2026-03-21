@@ -17,7 +17,7 @@ Accepts various forms of error/symptom reports:
 | **Error logs / panic output** | Extract file paths, function names, and error types from stack traces and goroutine dumps |
 | **Plain symptom description** | Identify keywords, then ask follow-up questions for environment and reproduction steps |
 | **Screenshots / images** | Read the image via the Read tool, interpret error messages and UI state on screen |
-| **Log file paths** | Read the file and extract relevant error/warning spans (`slog` output) |
+| **Log file paths** | Read the file and extract relevant error/warning log records (`slog` output) |
 
 If information is insufficient, ask the user follow-up questions. **Ask at most 2 rounds** of questions — if still insufficient, proceed with the available information.
 
@@ -44,7 +44,7 @@ Explore the codebase to trace the cause of the error.
 | Agent | `cmd/agent/`, `internal/agent/` |
 | Common/Shared | `internal/common/` |
 | Database | migrations (`goose`), `jmoiron/sqlx` queries |
-| Redis/Valkey | `valkey-io/valkey-glide-go` client code |
+| Redis/Valkey | `github.com/valkey-io/valkey-glide/go/v2` client code |
 | gRPC | `.proto` definitions, gRPC service impls |
 
 ### 3. Verdict and Report

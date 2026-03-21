@@ -151,9 +151,9 @@ func init() {
 func processAll(items []Item) error {
     errc := make(chan error, len(items))
     for _, item := range items {
-        go func() {
-            errc <- process(item)
-        }()
+        go func(it Item) {
+            errc <- process(it)
+        }(item)
     }
     for range items {
         if err := <-errc; err != nil {
@@ -373,11 +373,11 @@ Preferred packages:
 
 | Purpose | Package |
 |---------|---------|
-| HTTP server | `net/http` (stdlib) or `chi` |
+| HTTP server | `net/http` (stdlib) or `github.com/go-chi/chi/v5` |
 | Serialization | `encoding/json` (stdlib) |
 | Database | `github.com/jmoiron/sqlx` + `github.com/jackc/pgx/v5` (PostgreSQL) |
 | Migrations | `github.com/pressly/goose/v3` |
-| Redis/Valkey | `github.com/valkey-io/valkey-glide/go` |
+| Redis/Valkey | `github.com/valkey-io/valkey-glide/go/v2` |
 | gRPC | `google.golang.org/grpc` + `google.golang.org/protobuf` |
 | Logging | `log/slog` (stdlib) |
 | Testing | `testing` (stdlib) + `github.com/stretchr/testify` |
