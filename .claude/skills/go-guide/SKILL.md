@@ -80,16 +80,19 @@ type Counter struct {
 ## Naming (Effective Go)
 
 ### Packages
+
 - Lowercase, single-word names — **no underscores, no mixedCaps**
 - Package name provides context: `kernel.Status` not `kernel.KernelStatus`
 
 ### Exported Names
+
 - `MixedCaps` for exported, `mixedCaps` for unexported — **never underscores**
 - Getters: `Owner()` not `GetOwner()`; setters: `SetOwner()`
 - Avoid generic weasel words: ~~Manager~~, ~~Service~~, ~~Factory~~, ~~Handler~~
 - Use names that describe *what it does*: `JobScheduler`, `HeartbeatMonitor`, `SessionStore`
 
 ### Interfaces
+
 - One-method interfaces: method name + **-er suffix** (`Reader`, `Writer`, `Closer`)
 - Keep interfaces small (1-3 methods)
 - Honor canonical names: `Read`, `Write`, `Close`, `String` — use them only with matching semantics
@@ -258,7 +261,7 @@ govulncheck ./...              # dependency vulnerability check
 - Export only what is needed — unexported by default
 - Use `internal/` directory to prevent external imports
 
-```
+```text
 cmd/
   manager/main.go          # binary entry point
   agent/main.go            # binary entry point

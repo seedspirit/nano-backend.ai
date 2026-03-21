@@ -39,7 +39,7 @@ Post-implementation submission pipeline: quality enforcement, learning notes, co
 
 1. **Inventory test scenarios**: List all tests in changed packages. For each public function or endpoint, confirm both success and failure scenarios exist.
 
-   ```
+   ```markdown
    ## Test Coverage Report
    ### <package>::<file>
    - ok: <description>
