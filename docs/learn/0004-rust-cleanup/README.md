@@ -1,6 +1,6 @@
 # Rust 아티팩트 제거 — Go 마이그레이션 정리
 
-PR: #pending
+PR: #41
 Date: 2026-03-21
 
 ## What was done
