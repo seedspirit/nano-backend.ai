@@ -10,32 +10,30 @@ reviews:
   sequence_diagrams: true
   poem: false
   path_filters:
-    - "!target/**"
     - "!docs/learn/**"
   path_instructions:
-    - path: "crates/**/*.rs"
+    - path: "internal/**/*.go"
       instructions: |
-        This is a Rust project using Tokio async runtime and Axum web framework.
+        This is a Go project.
         Enforce these rules strictly:
-        - No .unwrap() or .expect() in production code (tests/benches/examples are allowed with explicit failure messages)
-        - No unsafe without justification comment
-        - No println! — use tracing crate (debug!, info!, warn!, error!)
-        - No panicking in library code
+        - No panic() in library code
+        - No fmt.Println — use log/slog for structured logging
         - All public functions must have success and error test scenarios
-    - path: "crates/common/**"
+        - External API responses must use the ApiResponse struct
+    - path: "internal/common/**"
       instructions: |
-        This is the shared types crate (dependency graph leaf).
-        It must NOT depend on any other workspace crate.
+        This is the shared types package (dependency graph leaf).
+        It must NOT depend on any other internal package.
         Changes to ApiResponse affect all consumers — flag breaking changes.
-    - path: "crates/manager/**"
+    - path: "internal/manager/**"
       instructions: |
-        This is the HTTP API server binary crate.
-        main.rs should only contain bootstrap logic.
-        New endpoints need a dedicated handler module + route in app.rs.
-    - path: "crates/agent/**"
+        This is the HTTP API server package.
+        main.go should only contain bootstrap logic.
+        New endpoints need a dedicated handler + route registration.
+    - path: "internal/agent/**"
       instructions: |
-        This is the agent binary crate.
-        Same rules as manager — main.rs is bootstrap only.
+        This is the agent package.
+        Same rules as manager — main.go is bootstrap only.
   auto_review:
     enabled: true
     drafts: false
