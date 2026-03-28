@@ -32,7 +32,7 @@ func NewLocalProcess() *LocalProcess {
 }
 
 // Create launches a child process described by spec and returns its KernelID.
-func (lp *LocalProcess) Create(_ context.Context, spec common.KernelSpec) (common.KernelID, error) {
+func (lp *LocalProcess) Create(ctx context.Context, spec common.KernelSpec) (common.KernelID, error) {
 	if len(spec.Command) == 0 {
 		return common.KernelID{}, &common.KernelError{
 			Op:  "create",
@@ -40,7 +40,7 @@ func (lp *LocalProcess) Create(_ context.Context, spec common.KernelSpec) (commo
 		}
 	}
 
-	cmd := exec.Command(spec.Command[0], spec.Command[1:]...) //nolint:gosec // command comes from trusted KernelSpec
+	cmd := exec.CommandContext(ctx, spec.Command[0], spec.Command[1:]...) //nolint:gosec // command comes from trusted KernelSpec
 	if err := cmd.Start(); err != nil {
 		return common.KernelID{}, &common.KernelError{
 			Op:  "create",
@@ -79,13 +79,15 @@ func (lp *LocalProcess) Destroy(_ context.Context, id common.KernelID) error {
 			Err: common.ErrKernelNotFound,
 		}
 	}
-	delete(lp.processes, id)
 	lp.mu.Unlock()
 
 	if err := entry.cmd.Process.Kill(); err != nil {
 		// Process may have already exited; not an error.
 		select {
 		case <-entry.done:
+			lp.mu.Lock()
+			delete(lp.processes, id)
+			lp.mu.Unlock()
 			return nil
 		default:
 			return &common.KernelError{
@@ -98,6 +100,9 @@ func (lp *LocalProcess) Destroy(_ context.Context, id common.KernelID) error {
 
 	// Wait for the reaper goroutine to finish.
 	<-entry.done
+	lp.mu.Lock()
+	delete(lp.processes, id)
+	lp.mu.Unlock()
 	return nil
 }
 

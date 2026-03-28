@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/seedspirit/nano-backend.ai/internal/common"
 )
@@ -93,9 +92,6 @@ func TestDestroySuccess(t *testing.T) {
 	if err := lp.Destroy(ctx, id); err != nil {
 		t.Fatalf("unexpected error on destroy: %v", err)
 	}
-
-	// Give the wait goroutine a moment to complete
-	time.Sleep(50 * time.Millisecond)
 }
 
 func TestDestroyNotFound(t *testing.T) {
