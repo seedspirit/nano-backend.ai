@@ -1,5 +1,103 @@
 # Go Programming
 
+## Struct와 메서드 — class 없는 OOP
+
+Go에는 `class`가 없다. 대신 `struct`로 데이터를 정의하고, 별도의 **메서드**를 붙여서 class처럼 사용한다.
+
+### class 기반 언어와의 비교
+
+```python
+# Python — class 안에 모든 것이 들어간다
+class LocalProcess:
+    def __init__(self):
+        self.processes = {}
+
+    def create(self, spec):
+        ...
+
+    def destroy(self, id):
+        ...
+```
+
+```go
+// Go — struct는 데이터만, 메서드는 밖에서 붙인다
+type LocalProcess struct {
+    mu        sync.Mutex
+    processes map[common.KernelID]*processEntry
+}
+
+func (lp *LocalProcess) Create(_ context.Context, spec common.KernelSpec) (common.KernelID, error) {
+    ...
+}
+
+func (lp *LocalProcess) Destroy(_ context.Context, id common.KernelID) error {
+    ...
+}
+```
+
+핵심 차이: Go에서 메서드는 struct 블록 안이 아니라 **밖에서** `func (receiver) MethodName(...)` 형태로 선언한다.
+
+### 리시버 (Receiver) — self/this 대신
+
+`func (lp *LocalProcess) Create(...)` 에서 `(lp *LocalProcess)` 부분이 **리시버**다.
+Python의 `self`, Java의 `this`에 해당하지만, 이름을 자유롭게 지을 수 있다.
+관례적으로 타입 이름의 첫 글자 소문자를 사용한다 (`LocalProcess` → `lp`).
+
+### 값 리시버 vs 포인터 리시버
+
+```go
+// 값 리시버 — struct가 복사됨. 원본을 변경할 수 없다.
+func (id KernelID) String() string {
+    return id.uuid.String()
+}
+
+// 포인터 리시버 — 원본을 직접 조작. 상태 변경이 필요할 때.
+func (lp *LocalProcess) Create(...) {
+    lp.processes[id] = entry  // 원본 map에 추가됨
+}
+```
+
+**언제 어떤 걸 쓰나:**
+- 값 리시버: 읽기 전용 (String(), MarshalJSON() 등)
+- 포인터 리시버: 내부 상태를 변경하거나 struct가 클 때 (복사 비용 회피)
+- 한 타입의 메서드가 하나라도 포인터 리시버를 쓰면, 일관성을 위해 전부 포인터 리시버를 쓰는 것이 관례
+
+### 생성자 — New 함수
+
+Go에는 `constructor`가 없다. 대신 `New` 접두사 함수를 생성자로 사용하는 관례가 있다:
+
+```go
+func NewLocalProcess() *LocalProcess {
+    return &LocalProcess{
+        processes: make(map[common.KernelID]*processEntry),
+    }
+}
+```
+
+`&LocalProcess{...}`는 struct를 힙에 할당하고 포인터를 반환한다.
+map처럼 초기화가 필요한 필드가 있을 때 생성자 함수가 유용하다.
+(`make(map[...])` 없이 nil map에 쓰면 런타임 panic이 발생한다.)
+
+### 상속 없음 — 대신 Composition
+
+Go에는 상속이 없다. 코드 재사용은 **임베딩(embedding)**으로 한다:
+
+```go
+// 상속이 아니라 "포함"
+type Server struct {
+    LocalProcess          // embedded — LocalProcess의 메서드를 Server에서 직접 호출 가능
+    addr         string
+}
+
+server := Server{}
+server.Create(ctx, spec) // LocalProcess.Create가 호출됨
+```
+
+하지만 이 프로젝트에서는 임베딩 대신 **인터페이스**로 다형성을 구현한다.
+`KernelRuntime` 인터페이스를 정의하고, `LocalProcess`가 이를 만족하는 구조다.
+
+참고: `internal/agent/local_process.go`
+
 ## Opaque Struct 패턴: unexported 필드로 불변성 강제
 
 Go에서는 struct의 필드를 소문자로 시작하면 패키지 외부에서 접근할 수 없다. 이를 활용하면 **생성자를 통해서만 유효한 값을 만들 수 있는** opaque type을 만들 수 있다.
@@ -143,24 +241,98 @@ var _ KernelRuntime = (*LocalProcessRuntime)(nil)
 
 참고: `internal/common/kernel.go:134-143`
 
-## `context.Context` 전파
+## context.Context — 취소·타임아웃·값 전달
 
-`KernelRuntime` 인터페이스의 모든 메서드가 첫 번째 인자로 `context.Context`를 받는다. 이는 Go의 관용적 패턴이다.
+Go에서 거의 모든 함수의 첫 번째 인자로 `ctx context.Context`가 등장한다.
+`context.Context`는 **작업의 수명(lifecycle)**을 제어하는 객체다.
+
+### 왜 필요한가?
+
+서버가 요청을 처리하는 도중 클라이언트가 연결을 끊으면, 이미 의미 없는 작업을 계속할 이유가 없다.
+context는 "이 작업을 더 이상 할 필요 없다"는 신호를 호출 체인 전체에 전파한다.
+
+### 세 가지 핵심 기능
 
 ```go
-Create(ctx context.Context, spec KernelSpec) (KernelID, error)
+// 1. 취소 (Cancellation)
+ctx, cancel := context.WithCancel(parent)
+cancel() // ctx.Done() 채널이 닫힘 → 하위 작업들이 중단 신호를 받음
+
+// 2. 타임아웃 (Timeout)
+ctx, cancel := context.WithTimeout(parent, 5*time.Second)
+defer cancel()
+// 5초 후 자동으로 ctx.Done() 채널이 닫힘
+
+// 3. 값 전달 (Value) — request ID, 인증 정보 등
+ctx = context.WithValue(parent, "requestID", "abc-123")
+val := ctx.Value("requestID") // "abc-123"
 ```
 
-**Context가 전달하는 것:**
-- **Cancellation**: 호출자가 취소하면 하위 작업도 중단
-- **Timeout/Deadline**: `context.WithTimeout(ctx, 5*time.Second)`
-- **Request-scoped values**: trace ID, 인증 정보 등
+### context를 받는 함수에서의 사용 패턴
 
-**규칙:**
-- 첫 번째 파라미터로 전달 (변수명 `ctx`)
-- struct 필드에 저장하지 않음
-- `context.Background()`는 최상위 호출에서만 사용
-- `nil` context를 전달하지 않음 — 불확실하면 `context.TODO()` 사용
+```go
+func doWork(ctx context.Context) error {
+    select {
+    case <-ctx.Done():
+        return ctx.Err() // context.Canceled 또는 context.DeadlineExceeded
+    case result := <-longOperation():
+        return process(result)
+    }
+}
+```
+
+`ctx.Done()`은 채널을 반환한다. context가 취소되면 이 채널이 닫히므로,
+`select`에서 취소 신호를 감지할 수 있다.
+
+### context의 부모-자식 구조
+
+context는 트리 형태로 구성된다. 부모가 취소되면 모든 자식도 취소된다.
+
+```
+Background (루트)
+├── WithTimeout (API 요청 전체: 30초)
+│   ├── WithCancel (DB 쿼리)
+│   └── WithCancel (외부 API 호출)
+```
+
+부모의 30초 타임아웃이 만료되면 DB 쿼리와 외부 API 호출 모두 취소된다.
+
+### context.Background vs context.TODO
+
+```go
+ctx := context.Background() // 루트 context. main이나 테스트에서 시작점으로 사용
+ctx := context.TODO()       // "아직 어떤 context를 써야 할지 모르겠다"는 표시
+```
+
+둘 다 빈 context를 반환하지만 의도가 다르다.
+`Background`는 의도적으로 루트를 만드는 것이고, `TODO`는 나중에 적절한 context로 교체하겠다는 표시다.
+
+### 이 프로젝트에서의 사용
+
+`KernelRuntime` 인터페이스가 모든 메서드에 `ctx`를 요구한다:
+
+```go
+type KernelRuntime interface {
+    Create(ctx context.Context, spec KernelSpec) (KernelID, error)
+    Destroy(ctx context.Context, id KernelID) error
+    Status(ctx context.Context, id KernelID) (KernelStatus, error)
+}
+```
+
+테스트에서는 `context.Background()`를 사용한다:
+
+```go
+ctx := context.Background()
+id, err := runtime.Create(ctx, spec)
+```
+
+### 관용적 규칙
+
+- 함수의 **첫 번째 인자**로 전달한다 (구조체 필드에 저장하지 않는다)
+- `nil` context를 전달하지 않는다 — 모르겠으면 `context.TODO()`를 쓴다
+- context는 **요청 범위(request-scoped)** 데이터에만 사용한다 — 함수 옵션 전달용이 아니다
+
+참고: `internal/common/kernel.go:134-143`
 
 ## 커스텀 JSON 마샬링: `json.Marshaler` / `json.Unmarshaler`
 
