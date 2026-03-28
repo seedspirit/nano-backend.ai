@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/seedspirit/nano-backend.ai/internal/common"
 )
@@ -16,12 +17,11 @@ func TestCreateSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	t.Cleanup(func() { _ = lp.Destroy(ctx, id) })
+
 	if id.IsZero() {
 		t.Error("expected non-zero KernelID")
 	}
-
-	// cleanup
-	_ = lp.Destroy(ctx, id)
 }
 
 func TestCreateReturnsUniqueIDs(t *testing.T) {
@@ -41,9 +41,10 @@ func TestCreateReturnsUniqueIDs(t *testing.T) {
 		t.Errorf("expected unique IDs, got %q and %q", id1, id2)
 	}
 
-	// cleanup
-	_ = lp.Destroy(ctx, id1)
-	_ = lp.Destroy(ctx, id2)
+	t.Cleanup(func() {
+		_ = lp.Destroy(ctx, id1)
+		_ = lp.Destroy(ctx, id2)
+	})
 }
 
 func TestCreateEmptyCommand(t *testing.T) {
@@ -138,6 +139,25 @@ func TestDestroyTwice(t *testing.T) {
 	}
 }
 
+// ── Helpers ───────────────────────────────────────────────────
+
+func waitForExited(t *testing.T, lp *LocalProcess, ctx context.Context, id common.KernelID) common.KernelStatus {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		status, err := lp.Status(ctx, id)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if status.Type == common.StatusExited {
+			return status
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("timeout waiting for process to exit")
+	return common.KernelStatus{}
+}
+
 // ── Status Tests ──────────────────────────────────────────────
 
 func TestStatusRunningProcess(t *testing.T) {
@@ -168,16 +188,7 @@ func TestStatusExitedZero(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Wait for process to exit
-	time.Sleep(100 * time.Millisecond)
-
-	status, err := lp.Status(ctx, id)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if status.Type != common.StatusExited {
-		t.Errorf("got status type %v, want %v", status.Type, common.StatusExited)
-	}
+	status := waitForExited(t, lp, ctx, id)
 	if status.Code != 0 {
 		t.Errorf("got exit code %d, want 0", status.Code)
 	}
@@ -192,16 +203,7 @@ func TestStatusExitedNonZero(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Wait for process to exit
-	time.Sleep(100 * time.Millisecond)
-
-	status, err := lp.Status(ctx, id)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if status.Type != common.StatusExited {
-		t.Errorf("got status type %v, want %v", status.Type, common.StatusExited)
-	}
+	status := waitForExited(t, lp, ctx, id)
 	if status.Code == 0 {
 		t.Error("expected non-zero exit code")
 	}

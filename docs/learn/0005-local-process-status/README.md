@@ -11,7 +11,7 @@ Date: 2026-03-21
 
 ## Categories
 
-- [Go Programming](./go.md)
+- [Go Programming](./go.md) — non-blocking channel select, ProcessState, 테스트 유틸리티와 패턴
 
 ## Key decisions
 
