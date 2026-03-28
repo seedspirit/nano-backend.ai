@@ -1,6 +1,6 @@
 # Go Coding Guidelines
 
-Directives for writing idiomatic Go code derived from production codebase conventions.
+Directives for writing idiomatic Go code.
 
 ---
 
