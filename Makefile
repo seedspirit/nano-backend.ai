@@ -1,4 +1,4 @@
-.PHONY: build test lint fmt clean
+.PHONY: build test check clean
 
 build:
 	go build ./...
@@ -6,11 +6,10 @@ build:
 test:
 	go test ./... -v
 
-lint:
-	golangci-lint run ./...
-
-fmt:
+check:
 	gofmt -w .
+	go build ./...
+	golangci-lint run ./...
 
 clean:
 	go clean ./...
