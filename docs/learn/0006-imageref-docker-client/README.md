@@ -19,7 +19,7 @@ Date: 2026-04-04
 | Decision | Why | Alternatives considered |
 |----------|-----|------------------------|
 | `ImageRef`를 opaque struct으로 구현 | `KernelID`와 동일한 패턴. unexported 필드로 불변성 보장, 팩토리 함수로만 생성 가능 | named string — 검증 누락 위험, 구조 정보 접근 불가 |
-| `KernelSpec.Image`를 `*ImageRef` (포인터)로 선언 | nil일 때 JSON에서 omitempty로 필드 자체가 생략됨 → LocalProcess 호환 | 별도 DockerKernelSpec 타입 — KernelRuntime 인터페이스 시그니처 ���기 필요 |
+| `KernelSpec.Image`를 `*ImageRef` (포인터)로 선언 | nil일 때 JSON에서 omitempty로 필드 자체가 생략됨 → LocalProcess 호환 | 별도 DockerKernelSpec 타입 — KernelRuntime 인터페이스 시그니처 변경 필요 |
 | `ContainerClient` 인터페이스로 Docker SDK 감싸기 | 단위 테스트 시 mock 주입 가능, 실제 Docker 데몬 불필요 | SDK 직접 사용 — 테스트마다 Docker 필요 |
 | Docker SDK의 container 패키지 타입을 인터페이스에 직접 사용 | 불필요한 중간 타입 정의 방지, SDK 타입이 이미 잘 정의되어 있음 | 자체 타입 정의 — 변환 보일러플레이트 증가 |
 
