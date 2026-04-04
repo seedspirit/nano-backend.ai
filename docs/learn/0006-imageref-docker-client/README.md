@@ -1,6 +1,6 @@
 # ImageRef 타입 및 Docker 클라이언트 인터페이스
 
-PR: pending
+PR: #60
 Date: 2026-04-04
 
 ## What was done
