@@ -3,6 +3,7 @@ package common
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -136,6 +137,74 @@ func TestKernelSpecDeserialize(t *testing.T) {
 	}
 	if spec.Command[1] != "hello" {
 		t.Errorf("got command[1] %q, want %q", spec.Command[1], "hello")
+	}
+}
+
+func TestKernelSpecWithoutImageBackwardCompat(t *testing.T) {
+	// KernelSpec without Image should serialize exactly as before.
+	spec := KernelSpec{Command: []string{"echo", "hello"}}
+
+	data, err := json.Marshal(spec)
+	if err != nil {
+		t.Fatalf("unexpected marshal error: %v", err)
+	}
+
+	// Image field must be omitted (not present as null).
+	raw := string(data)
+	if strings.Contains(raw, "image") {
+		t.Errorf("expected no image field in JSON, got %s", raw)
+	}
+
+	var decoded KernelSpec
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("unexpected unmarshal error: %v", err)
+	}
+	if decoded.Image != nil {
+		t.Errorf("expected nil Image, got %v", decoded.Image)
+	}
+}
+
+func TestKernelSpecWithImageRoundtrip(t *testing.T) {
+	ref, _ := ParseImageRef("nginx:1.25")
+	spec := KernelSpec{
+		Command: []string{"nginx", "-g", "daemon off;"},
+		Image:   &ref,
+	}
+
+	data, err := json.Marshal(spec)
+	if err != nil {
+		t.Fatalf("unexpected marshal error: %v", err)
+	}
+
+	var decoded KernelSpec
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("unexpected unmarshal error: %v", err)
+	}
+
+	if decoded.Image == nil {
+		t.Fatal("expected non-nil Image")
+	}
+	if decoded.Image.Repository() != "library/nginx" {
+		t.Errorf("got repo %q, want %q", decoded.Image.Repository(), "library/nginx")
+	}
+	if decoded.Image.Tag() != "1.25" {
+		t.Errorf("got tag %q, want %q", decoded.Image.Tag(), "1.25")
+	}
+}
+
+func TestKernelSpecDeserializeWithoutImage(t *testing.T) {
+	// Old-format JSON without image field should still work.
+	input := `{"command":["sleep","10"]}`
+
+	var spec KernelSpec
+	if err := json.Unmarshal([]byte(input), &spec); err != nil {
+		t.Fatalf("unexpected unmarshal error: %v", err)
+	}
+	if spec.Image != nil {
+		t.Errorf("expected nil Image, got %v", spec.Image)
+	}
+	if spec.Command[0] != "sleep" {
+		t.Errorf("got command[0] %q, want %q", spec.Command[0], "sleep")
 	}
 }
 

@@ -63,7 +63,8 @@ func (id *KernelID) UnmarshalJSON(data []byte) error {
 
 // KernelSpec describes how to create a new kernel.
 type KernelSpec struct {
-	Command []string `json:"command"`
+	Command []string  `json:"command"`
+	Image   *ImageRef `json:"image,omitempty"`
 }
 
 // KernelStatusType represents the kind of kernel status.
