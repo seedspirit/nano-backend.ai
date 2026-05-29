@@ -13,6 +13,21 @@ Post-implementation submission pipeline: quality enforcement, learning notes, co
 - **issue** (optional): GitHub issue number (e.g., `#12` or `12`). Auto-detected from branch name if pattern `issue-\d+` exists.
 - **base_branch** (optional): Target branch for PR. Defaults to `main`.
 
+## Repository Target Rule
+
+This workspace is the `Frontier-Lab-Tycoon/nano-backend.ai` fork. All push and PR operations for this repository MUST target the fork, not upstream.
+
+- Required push remote: `origin` → `https://github.com/Frontier-Lab-Tycoon/nano-backend.ai.git`
+- Required PR repo: `Frontier-Lab-Tycoon/nano-backend.ai`
+- Upstream `seedspirit/nano-backend.ai` may be used only for fetch/compare context, never as the PR creation target.
+- Before creating a PR, verify:
+  ```bash
+  git remote get-url origin
+  gh repo view Frontier-Lab-Tycoon/nano-backend.ai --json nameWithOwner,defaultBranchRef
+  gh pr list --repo Frontier-Lab-Tycoon/nano-backend.ai --head <branch> --json number,title,url,isDraft
+  ```
+- Always pass `--repo Frontier-Lab-Tycoon/nano-backend.ai` to `gh pr create`, `gh pr view`, and `gh pr list` during submit.
+
 ## Workflow
 
 ### Phase 1: Pre-flight
@@ -213,7 +228,20 @@ Backend.AI's Manager/Agent/Storage structure, session lifecycle, API design, dom
 
 2. **Create PR**
 
-   If a linked issue exists, the PR body must include the issue context and how it was resolved:
+   Use the fork repository explicitly:
+
+   ```bash
+   gh pr create \
+     --repo Frontier-Lab-Tycoon/nano-backend.ai \
+     --head "{branch_name}" \
+     --base "{base_branch}" \
+     --draft \
+     ...
+   ```
+
+   **PR body style** — 짧고 의도 중심으로. 변경 파일 list (`pkg/module/file — what changed`) 는 절대 쓰지 말 것 — diff와 Files Changed 탭이 보여준다. 본문은 (a) 왜 필요한가, (b) 어떤 핵심 결정을 내렸나, (c) 어떻게 검증했나를 담는다.
+
+   If a linked issue exists:
 
    ```bash
    gh pr create --title "type(scope): description" --body "$(cat <<'EOF'
@@ -221,58 +249,31 @@ Backend.AI's Manager/Agent/Storage structure, session lifecycle, API design, dom
 
    Resolves #<number>
 
-   **Problem**: <What was wrong or missing? 1-2 sentences.>
+   <Problem statement — 한두 문장으로 무엇이 비어 있었거나 잘못됐었는지.>
 
    ## Solution
 
-   **Approach**: <Why this approach? Key design choice and reasoning.>
+   <Approach — 한두 문장. 동반 cleanup이 있으면 한 줄로 덧붙임.>
 
-   ### Changes
-   - `pkg/module/file` — <what changed and why>
-   - `pkg/module/file` — <what changed and why>
+   ## Key Decisions
 
-   ### Key Decisions
    | Decision | Why |
    |----------|-----|
-   | <e.g., used newtype pattern> | <reason> |
+   | <decision 1> | <reason> |
+   | <decision 2> | <reason> |
 
    ## What I learned
    <1-2 sentences linking to the learning doc directory>
    See: `docs/learn/NNNN-<slug>/`
 
    ## Test Plan
-   - [ ] <scenario: what is being verified>
-   - [ ] <scenario>
+   - [ ] <핵심 검증 시나리오>
+   - [ ] <핵심 검증 시나리오>
    EOF
    )"
    ```
 
-   If no linked issue:
-
-   ```bash
-   gh pr create --title "type(scope): description" --body "$(cat <<'EOF'
-   ## Background
-   <Why this change? What problem or need does it address?>
-
-   ## Changes
-   - `pkg/module/file` — <what changed and why>
-   - `pkg/module/file` — <what changed and why>
-
-   ### Key Decisions
-   | Decision | Why |
-   |----------|-----|
-   | <e.g., chose X over Y> | <reason> |
-
-   ## What I learned
-   <1-2 sentences linking to the learning doc directory>
-   See: `docs/learn/NNNN-<slug>/`
-
-   ## Test Plan
-   - [ ] <scenario: what is being verified>
-   - [ ] <scenario>
-   EOF
-   )"
-   ```
+   If no linked issue, replace `## Issue` with `## Background` (한두 문장 motivation) and keep the rest of the structure.
 
 3. Update the learning doc's PR number if it was "pending"
 
