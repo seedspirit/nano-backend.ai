@@ -3,37 +3,45 @@ early_access: false
 enable_free_tier: true
 
 reviews:
-  profile: "assertive"
+  profile: "chill"
   high_level_summary: true
   review_status: true
   collapse_walkthrough: false
   sequence_diagrams: true
   poem: false
+  finishing_touches:
+    unit_tests:
+      enabled: false
   path_filters:
     - "!docs/learn/**"
   path_instructions:
     - path: "internal/**/*.go"
       instructions: |
-        This is a Go project.
-        Enforce these rules strictly:
-        - No panic() in library code
+        This is a Go project. Flag only high-confidence, important issues; skip
+        stylistic nitpicks. Enforce these rules:
+        - No panic() in library code; return error values
         - No fmt.Println — use log/slog for structured logging
-        - All public functions must have success and error test scenarios
-        - External API responses must use the ApiResponse struct
+        - External API responses must use the response envelope in
+          internal/common/dto/response (response.Response / response.Err) with a
+          stable error.code from internal/common/errordef — no ad-hoc JSON
+        Do not flag missing unit tests or test coverage; test scope is decided per-change.
     - path: "internal/common/**"
       instructions: |
-        This is the shared types package (dependency graph leaf).
-        It must NOT depend on any other internal package.
-        Changes to ApiResponse affect all consumers — flag breaking changes.
+        Shared code used across binaries and manager/agent.
+        - Must NOT import manager, agent, server, service, or repository
+          implementation packages. Cross-dependencies within internal/common are allowed.
+        - The response envelope (dto/response) and errordef are shared contracts —
+          flag breaking changes that ripple to consumers.
     - path: "internal/manager/**"
       instructions: |
-        This is the HTTP API server package.
-        main.go should only contain bootstrap logic.
-        New endpoints need a dedicated handler + route registration.
+        Manager application layer. internal/manager owns composition/wiring;
+        request parsing and routes live in servers/ handler packages; business
+        workflow lives in service/ packages. New endpoints need a dedicated
+        handler + route registration. Process bootstrap is in cmd/manager/main.go only.
     - path: "internal/agent/**"
       instructions: |
-        This is the agent package.
-        Same rules as manager — main.go is bootstrap only.
+        Agent library code. Process bootstrap is in cmd/agent/main.go only
+        (internal/agent must not contain entry-point/bootstrap logic).
   auto_review:
     enabled: true
     drafts: false
