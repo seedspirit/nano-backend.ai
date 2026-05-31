@@ -11,7 +11,7 @@ import (
 	"github.com/seedspirit/nano-backend.ai/internal/common/data/run"
 	"github.com/seedspirit/nano-backend.ai/internal/common/data/run/preset"
 	"github.com/seedspirit/nano-backend.ai/internal/common/data/run/spec"
-	"github.com/seedspirit/nano-backend.ai/internal/manager/errordef"
+	"github.com/seedspirit/nano-backend.ai/internal/common/errordef"
 	runspecpreset "github.com/seedspirit/nano-backend.ai/internal/manager/runspec/preset"
 )
 

@@ -4,10 +4,13 @@ This directory contains shared code that can be used across binaries and manager
 
 ## Directory Index
 
+- `agent/` — shared agent identity types.
 - `data/` — pure application data types used by business logic.
 - `dto/` — API boundary types used for serialization and deserialization.
 - `encoding/` — small shared encoding helpers.
+- `errordef/` — stable error codes and response-envelope mapping.
 - `kernel/` — runtime-facing kernel types and ports.
+- `workload/` — manager-agent workload contract types (Plan, Ref, value types).
 
 ## Constraints
 

@@ -12,7 +12,7 @@ import (
 	"github.com/seedspirit/nano-backend.ai/internal/common/data/run/spec"
 	"github.com/seedspirit/nano-backend.ai/internal/common/dto/request"
 	"github.com/seedspirit/nano-backend.ai/internal/common/dto/response"
-	"github.com/seedspirit/nano-backend.ai/internal/manager/errordef"
+	"github.com/seedspirit/nano-backend.ai/internal/common/errordef"
 )
 
 type runHandler struct {
