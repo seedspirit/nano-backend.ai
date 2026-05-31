@@ -1,6 +1,6 @@
 # Manager-Agent Workload Contract (#67)
 
-PR: pending
+PR: #86
 Date: 2026-05-31
 
 ## What was done
