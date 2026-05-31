@@ -15,18 +15,24 @@ Post-implementation submission pipeline: quality enforcement, learning notes, co
 
 ## Repository Target Rule
 
-This workspace is the `Frontier-Lab-Tycoon/nano-backend.ai` fork. All push and PR operations for this repository MUST target the fork, not upstream.
+All push and PR operations MUST target the repository backing the `origin`
+remote. Do not hardcode an owner/name — resolve it at runtime so the workflow
+follows whatever `origin` currently points to.
 
-- Required push remote: `origin` → `https://github.com/Frontier-Lab-Tycoon/nano-backend.ai.git`
-- Required PR repo: `Frontier-Lab-Tycoon/nano-backend.ai`
-- Upstream `seedspirit/nano-backend.ai` may be used only for fetch/compare context, never as the PR creation target.
+- Push to `origin`.
+- Resolve the PR target repo from `origin`, then reuse it for every `gh` call:
+  ```bash
+  ORIGIN_REPO=$(gh repo view "$(git remote get-url origin)" --json nameWithOwner -q .nameWithOwner)
+  ```
+- Any other remote (e.g. an upstream/fork source) is for fetch/compare context
+  only, never a push or PR target.
 - Before creating a PR, verify:
   ```bash
   git remote get-url origin
-  gh repo view Frontier-Lab-Tycoon/nano-backend.ai --json nameWithOwner,defaultBranchRef
-  gh pr list --repo Frontier-Lab-Tycoon/nano-backend.ai --head <branch> --json number,title,url,isDraft
+  gh repo view "$ORIGIN_REPO" --json nameWithOwner,defaultBranchRef
+  gh pr list --repo "$ORIGIN_REPO" --head <branch> --json number,title,url,isDraft
   ```
-- Always pass `--repo Frontier-Lab-Tycoon/nano-backend.ai` to `gh pr create`, `gh pr view`, and `gh pr list` during submit.
+- Pass `--repo "$ORIGIN_REPO"` to `gh pr create`, `gh pr view`, and `gh pr list` during submit.
 
 ## Workflow
 
@@ -228,11 +234,11 @@ Backend.AI's Manager/Agent/Storage structure, session lifecycle, API design, dom
 
 2. **Create PR**
 
-   Use the fork repository explicitly:
+   Target the resolved origin repository:
 
    ```bash
    gh pr create \
-     --repo Frontier-Lab-Tycoon/nano-backend.ai \
+     --repo "$ORIGIN_REPO" \
      --head "{branch_name}" \
      --base "{base_branch}" \
      --draft \
