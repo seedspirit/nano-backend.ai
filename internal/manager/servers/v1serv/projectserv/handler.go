@@ -8,7 +8,7 @@ import (
 	"github.com/labstack/echo/v5"
 	"github.com/seedspirit/nano-backend.ai/internal/common/data/run"
 	"github.com/seedspirit/nano-backend.ai/internal/common/dto/response"
-	"github.com/seedspirit/nano-backend.ai/internal/manager/errordef"
+	"github.com/seedspirit/nano-backend.ai/internal/common/errordef"
 )
 
 // defaultProjectRunsLimit is the Phase 0 list size before cursor pagination.

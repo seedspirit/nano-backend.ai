@@ -8,7 +8,7 @@ import (
 	"sort"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/seedspirit/nano-backend.ai/internal/manager/errordef"
+	"github.com/seedspirit/nano-backend.ai/internal/common/errordef"
 	_ "modernc.org/sqlite"
 )
 

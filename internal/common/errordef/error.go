@@ -37,6 +37,10 @@ var (
 	Internal = ErrorCode{code: "internal_error", statusCode: http.StatusInternalServerError}
 	// NotImplemented indicates that a requested operation is not implemented.
 	NotImplemented = ErrorCode{code: "not_implemented", statusCode: http.StatusNotImplemented}
+	// ImagePullFailed indicates that a workload image could not be pulled during preparation.
+	ImagePullFailed = ErrorCode{code: "image_pull_failed", statusCode: http.StatusBadGateway}
+	// ContainerCreateFailed indicates that a workload container could not be created during preparation.
+	ContainerCreateFailed = ErrorCode{code: "container_create_failed", statusCode: http.StatusBadGateway}
 )
 
 var (
@@ -56,6 +60,10 @@ var (
 	ErrInternal = Error(Internal, "internal error")
 	// ErrNotImplemented is the sentinel error for NotImplemented.
 	ErrNotImplemented = Error(NotImplemented, "not implemented")
+	// ErrImagePullFailed is the sentinel error for ImagePullFailed.
+	ErrImagePullFailed = Error(ImagePullFailed, "image pull failed")
+	// ErrContainerCreateFailed is the sentinel error for ContainerCreateFailed.
+	ErrContainerCreateFailed = Error(ContainerCreateFailed, "container create failed")
 )
 
 // Error creates an error with a stable machine-readable code.

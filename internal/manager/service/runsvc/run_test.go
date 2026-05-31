@@ -10,7 +10,7 @@ import (
 	"github.com/seedspirit/nano-backend.ai/internal/common/data/run"
 	"github.com/seedspirit/nano-backend.ai/internal/common/data/run/draft"
 	"github.com/seedspirit/nano-backend.ai/internal/common/data/run/spec"
-	"github.com/seedspirit/nano-backend.ai/internal/manager/errordef"
+	"github.com/seedspirit/nano-backend.ai/internal/common/errordef"
 )
 
 type stubBuilder struct {

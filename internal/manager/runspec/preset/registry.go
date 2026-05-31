@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/seedspirit/nano-backend.ai/internal/manager/errordef"
+	"github.com/seedspirit/nano-backend.ai/internal/common/errordef"
 )
 
 // StaticRegistry stores presets in memory.

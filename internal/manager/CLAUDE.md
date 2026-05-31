@@ -25,7 +25,6 @@ This directory owns manager application composition.
 - `repository/db/` — database-backed repository implementations and storage mapping.
 - `runspec/` — domain workflow for turning draft input and presets into finalized specs.
 - `preset/` — manager-owned preset registry and fixture-backed preset data.
-- `errordef/` — stable manager error codes and response-envelope mapping.
 
 ## Dependency Direction
 
