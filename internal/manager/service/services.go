@@ -1,12 +1,12 @@
 package service
 
 import (
-	"github.com/seedspirit/nano-backend.ai/internal/manager/service/runsvc"
+	"github.com/seedspirit/nano-backend.ai/internal/manager/service/sessionsvc"
 )
 
 // Services groups manager service dependencies for handlers.
 type Services struct {
-	RunSvc *runsvc.Service
+	SessionSvc *sessionsvc.Service
 }
 
 // NewServices creates an empty service registry.
@@ -14,8 +14,8 @@ func NewServices() *Services {
 	return &Services{}
 }
 
-// WithRunService registers the run service.
-func (s *Services) WithRunService(args runsvc.Args) *Services {
-	s.RunSvc = runsvc.NewService(args)
+// WithSessionService registers the session service.
+func (s *Services) WithSessionService(args sessionsvc.Args) *Services {
+	s.SessionSvc = sessionsvc.NewService(args)
 	return s
 }

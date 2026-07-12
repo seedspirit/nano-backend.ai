@@ -7,14 +7,16 @@ package request
 
 import (
 	"github.com/google/uuid"
-	"github.com/seedspirit/nano-backend.ai/internal/common/data/run/draft"
+	"github.com/seedspirit/nano-backend.ai/internal/common/data/session"
+	"github.com/seedspirit/nano-backend.ai/internal/common/data/session/draft"
 )
 
-// RunDraftReq is the user-submitted input used to create a run draft.
-type RunDraftReq struct {
+// SessionSpecDraftReq is the user-submitted input used to create a session spec draft.
+type SessionSpecDraftReq struct {
 	ProjectID       uuid.UUID          `json:"project_id"`
 	Name            string             `json:"name"`
 	Description     string             `json:"description,omitempty"`
+	Type            session.Type       `json:"type,omitempty"`
 	PresetRefs      PresetRefsReq      `json:"preset_refs,omitempty"`
 	ModelOptions    ModelOptionsReq    `json:"model_options"`
 	DataOptions     DataOptionsReq     `json:"data_options"`
@@ -23,15 +25,20 @@ type RunDraftReq struct {
 }
 
 // ToDraft assigns identity to a submitted request and converts it into a Draft.
-func (req *RunDraftReq) ToDraft(id uuid.UUID) draft.Draft {
+func (req *SessionSpecDraftReq) ToDraft(id uuid.UUID) draft.Draft {
 	if req == nil {
 		return draft.Draft{ID: id}
+	}
+	sessionType := req.Type
+	if sessionType == "" {
+		sessionType = session.Batch
 	}
 	return draft.Draft{
 		ID:              id,
 		ProjectID:       req.ProjectID,
 		Name:            req.Name,
 		Description:     req.Description,
+		Type:            sessionType,
 		PresetRefs:      presetRefsToDraft(req.PresetRefs),
 		ModelOptions:    modelOptionsToDraft(req.ModelOptions),
 		DataOptions:     dataOptionsToDraft(req.DataOptions),

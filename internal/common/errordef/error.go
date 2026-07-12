@@ -24,22 +24,22 @@ var (
 	NotFound = ErrorCode{code: "not_found", statusCode: http.StatusNotFound}
 	// IdempotencyConflict indicates that an idempotency key was reused with different input.
 	IdempotencyConflict = ErrorCode{code: "idempotency_conflict", statusCode: http.StatusConflict}
-	// ArtifactIndexMissing indicates that a run exists but no artifact index was saved.
+	// ArtifactIndexMissing indicates that a session exists but no artifact index was saved.
 	ArtifactIndexMissing = ErrorCode{code: "artifact_index_missing", statusCode: http.StatusNotFound}
 	// InvalidInput indicates that a request or internal call passed invalid input.
 	InvalidInput = ErrorCode{code: "invalid_input", statusCode: http.StatusBadRequest}
 	// ValidationError indicates a parsed request failed a domain or preset
 	// rule. Use InvalidInput for transport-level malformation.
 	ValidationError = ErrorCode{code: "validation_error", statusCode: http.StatusUnprocessableEntity}
-	// InvalidRunID indicates that a run ID path parameter is not a UUID.
-	InvalidRunID = ErrorCode{code: "invalid_run_id", statusCode: http.StatusBadRequest}
+	// InvalidSessionID indicates that a session ID path parameter is not a UUID.
+	InvalidSessionID = ErrorCode{code: "invalid_session_id", statusCode: http.StatusBadRequest}
 	// Internal indicates an unexpected manager error.
 	Internal = ErrorCode{code: "internal_error", statusCode: http.StatusInternalServerError}
 	// NotImplemented indicates that a requested operation is not implemented.
 	NotImplemented = ErrorCode{code: "not_implemented", statusCode: http.StatusNotImplemented}
-	// ImagePullFailed indicates that a workload image could not be pulled during preparation.
+	// ImagePullFailed indicates that a kernel image could not be pulled during preparation.
 	ImagePullFailed = ErrorCode{code: "image_pull_failed", statusCode: http.StatusBadGateway}
-	// ContainerCreateFailed indicates that a workload container could not be created during preparation.
+	// ContainerCreateFailed indicates that a kernel container could not be created during preparation.
 	ContainerCreateFailed = ErrorCode{code: "container_create_failed", statusCode: http.StatusBadGateway}
 )
 
@@ -54,8 +54,8 @@ var (
 	ErrInvalidInput = Error(InvalidInput, "invalid input")
 	// ErrValidation is the sentinel error for ValidationError.
 	ErrValidation = Error(ValidationError, "validation failed")
-	// ErrInvalidRunID is the sentinel error for InvalidRunID.
-	ErrInvalidRunID = Error(InvalidRunID, "run ID must be a UUID")
+	// ErrInvalidSessionID is the sentinel error for InvalidSessionID.
+	ErrInvalidSessionID = Error(InvalidSessionID, "session ID must be a UUID")
 	// ErrInternal is the sentinel error for Internal.
 	ErrInternal = Error(Internal, "internal error")
 	// ErrNotImplemented is the sentinel error for NotImplemented.

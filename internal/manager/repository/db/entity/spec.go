@@ -6,9 +6,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/seedspirit/nano-backend.ai/internal/common/data/run"
-	"github.com/seedspirit/nano-backend.ai/internal/common/data/run/preset"
-	"github.com/seedspirit/nano-backend.ai/internal/common/data/run/spec"
+	"github.com/seedspirit/nano-backend.ai/internal/common/data/session"
+	"github.com/seedspirit/nano-backend.ai/internal/common/data/session/preset"
+	"github.com/seedspirit/nano-backend.ai/internal/common/data/session/spec"
 	"github.com/seedspirit/nano-backend.ai/internal/common/encoding"
 )
 
@@ -16,6 +16,7 @@ import (
 type Spec struct {
 	ID                             string `db:"id"`
 	ProjectID                      string `db:"project_id"`
+	Type                           string `db:"type"`
 	Name                           string `db:"name"`
 	Description                    string `db:"description"`
 	ModelBaseModel                 string `db:"model_base_model"`
@@ -74,6 +75,7 @@ func (s *Spec) ToData() (spec.Spec, error) {
 	return spec.Spec{
 		ID:          id,
 		ProjectID:   projectID,
+		Type:        session.Type(s.Type),
 		Name:        s.Name,
 		Description: s.Description,
 		PresetRefs:  s.PresetRefs,
@@ -84,10 +86,10 @@ func (s *Spec) ToData() (spec.Spec, error) {
 			Datasets: datasets,
 		},
 		ResourceOptions: spec.ResourceOptions{
-			CPU:     run.CPUOptions{Cores: s.ResourceCPUCores},
-			GPU:     run.GPUOptions{Count: s.ResourceGPUCount},
-			Memory:  run.MemoryOptions{LimitBytes: s.ResourceMemoryLimitBytes},
-			Timeout: run.TimeoutOptions{DurationSeconds: s.ResourceTimeoutDurationSeconds},
+			CPU:     session.CPUOptions{Cores: s.ResourceCPUCores},
+			GPU:     session.GPUOptions{Count: s.ResourceGPUCount},
+			Memory:  session.MemoryOptions{LimitBytes: s.ResourceMemoryLimitBytes},
+			Timeout: session.TimeoutOptions{DurationSeconds: s.ResourceTimeoutDurationSeconds},
 		},
 		TrainingOptions: spec.TrainingOptions{
 			Parameters: parameters,
@@ -125,9 +127,15 @@ func FromData(source *spec.Spec, createdAt string) (Spec, error) {
 		})
 	}
 
+	sessionType := source.Type
+	if sessionType == "" {
+		sessionType = session.Batch
+	}
+
 	return Spec{
 		ID:                             source.ID.String(),
 		ProjectID:                      source.ProjectID.String(),
+		Type:                           string(sessionType),
 		Name:                           source.Name,
 		Description:                    source.Description,
 		ModelBaseModel:                 source.ModelOptions.BaseModel,
