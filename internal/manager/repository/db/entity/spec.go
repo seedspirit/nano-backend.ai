@@ -31,14 +31,14 @@ type Spec struct {
 	TrainingParameters []SpecTrainingParameter
 }
 
-// SpecDataset is the database record shape for a spec_datasets row.
+// SpecDataset is the database record shape for a session_datasets row.
 type SpecDataset struct {
 	Ordinal    int    `db:"ordinal"`
 	DatasetRef string `db:"dataset_ref"`
 	SplitName  string `db:"split_name"`
 }
 
-// SpecTrainingParameter is the database record shape for a spec_training_parameters row.
+// SpecTrainingParameter is the database record shape for a session_training_parameters row.
 //
 // Value is a JSON number literal (e.g. "3", "0.0002"). The server keeps the
 // stored representation as a string so it does not commit to int vs float;

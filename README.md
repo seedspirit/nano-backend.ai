@@ -71,7 +71,7 @@ SessionSpecDraft
   -> API preflight validation
   -> preset registry / spec builder
   -> immutable session spec.Spec
-  -> SQLite session ledger
+  -> SQLite session ledger (the Session owns the finalized definition)
   -> SchedulerCoordinator
   -> SessionProvisioner / GPU claim
   -> kernel.CreationSpec
@@ -96,7 +96,7 @@ pending -> preparing -> running -> terminated
 | KernelLauncher | Manager-side port for prepare/start/cleanup calls |
 | DockerRuntime | Agent-side Docker container materialization and observation |
 | SQLite | Durable source of truth for projects, sessions, and artifact metadata |
-| Local artifact store | Stores specs, resolved configs, logs, metrics, reports, adapters |
+| Local artifact store | Stores resolved configs, logs, metrics, reports, adapters |
 
 ## Tech Stack
 

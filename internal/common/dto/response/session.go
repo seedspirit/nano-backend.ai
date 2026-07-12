@@ -12,7 +12,6 @@ import (
 type SessionSummary struct {
 	ID             uuid.UUID              `json:"id"`
 	ProjectID      uuid.UUID              `json:"project_id"`
-	SpecID         uuid.UUID              `json:"spec_id"`
 	Type           session.Type           `json:"type"`
 	IdempotencyKey *string                `json:"idempotency_key,omitempty"`
 	Status         session.Status         `json:"status"`
@@ -34,7 +33,6 @@ func NewSessionSummary(source *session.Session) SessionSummary {
 	return SessionSummary{
 		ID:             source.ID,
 		ProjectID:      source.ProjectID,
-		SpecID:         source.SpecID,
 		Type:           source.Type,
 		IdempotencyKey: source.IdempotencyKey,
 		Status:         source.Lifecycle.Status,

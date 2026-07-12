@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS projects (
     created_at TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS specs (
+CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
     project_id TEXT NOT NULL REFERENCES projects(id),
     type TEXT NOT NULL DEFAULT 'batch',
@@ -18,24 +18,32 @@ CREATE TABLE IF NOT EXISTS specs (
     resource_gpu_count                INTEGER NOT NULL,
     resource_memory_limit_bytes       INTEGER NOT NULL,
     resource_timeout_duration_seconds INTEGER NOT NULL,
-    created_at TEXT NOT NULL
+    idempotency_key TEXT,
+    status TEXT NOT NULL,
+    result TEXT NOT NULL DEFAULT 'undefined',
+    failure_reason TEXT,
+    artifact_base_path TEXT,
+    created_at TEXT NOT NULL,
+    started_at TEXT,
+    finished_at TEXT,
+    UNIQUE(project_id, idempotency_key)
 );
 
-CREATE TABLE IF NOT EXISTS spec_datasets (
-    spec_id     TEXT NOT NULL REFERENCES specs(id) ON DELETE CASCADE,
+CREATE TABLE IF NOT EXISTS session_datasets (
+    session_id  TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
     ordinal     INTEGER NOT NULL,
     dataset_ref TEXT NOT NULL,
     split_name  TEXT NOT NULL,
-    PRIMARY KEY (spec_id, ordinal)
+    PRIMARY KEY (session_id, ordinal)
 );
 
-CREATE TABLE IF NOT EXISTS spec_training_parameters (
-    spec_id TEXT NOT NULL REFERENCES specs(id) ON DELETE CASCADE,
+CREATE TABLE IF NOT EXISTS session_training_parameters (
+    session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
     key     TEXT NOT NULL,
     -- Stored as a JSON number literal (json.Number compatible: "3", "0.0002", "2.0e-4").
     -- Server defers int/float decision; consumers (yaml emission, etc.) cast as needed.
     value   TEXT NOT NULL,
-    PRIMARY KEY (spec_id, key)
+    PRIMARY KEY (session_id, key)
 );
 
 CREATE TABLE IF NOT EXISTS preset_categories (
@@ -125,27 +133,11 @@ INSERT OR IGNORE INTO preset_default_values (preset_id, key, value_json) VALUES
     ('258e5d45-c4e1-40a4-9f88-8fbb0b7f7c75', 'lora_alpha', '32'),
     ('258e5d45-c4e1-40a4-9f88-8fbb0b7f7c75', 'micro_batch_size', '1');
 
-CREATE TABLE IF NOT EXISTS spec_preset_refs (
-    spec_id TEXT NOT NULL REFERENCES specs(id) ON DELETE CASCADE,
+CREATE TABLE IF NOT EXISTS session_preset_refs (
+    session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
     category TEXT NOT NULL REFERENCES preset_categories(id),
     preset_id TEXT NOT NULL REFERENCES presets(id),
-    PRIMARY KEY(spec_id, category)
-);
-
-CREATE TABLE IF NOT EXISTS sessions (
-    id TEXT PRIMARY KEY,
-    project_id TEXT NOT NULL REFERENCES projects(id),
-    spec_id TEXT NOT NULL REFERENCES specs(id),
-    type TEXT NOT NULL DEFAULT 'batch',
-    idempotency_key TEXT,
-    status TEXT NOT NULL,
-    result TEXT NOT NULL DEFAULT 'undefined',
-    failure_reason TEXT,
-    artifact_base_path TEXT,
-    created_at TEXT NOT NULL,
-    started_at TEXT,
-    finished_at TEXT,
-    UNIQUE(project_id, idempotency_key)
+    PRIMARY KEY(session_id, category)
 );
 
 CREATE INDEX IF NOT EXISTS idx_sessions_project_created_at

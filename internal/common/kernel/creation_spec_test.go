@@ -30,7 +30,7 @@ func mustPath(t *testing.T, s string) AgentPath {
 // validParts returns a complete, valid kernel creation spec for tests.
 func validParts(t *testing.T) CreationSpecArgs {
 	t.Helper()
-	id, err := NewIdentifiers(uuid.New(), uuid.New(), uuid.New())
+	id, err := NewIdentifiers(uuid.New(), uuid.New())
 	if err != nil {
 		t.Fatalf("NewIdentifiers: %v", err)
 	}

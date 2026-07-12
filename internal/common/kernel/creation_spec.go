@@ -29,7 +29,7 @@ type CreationSpecArgs struct {
 // NewCreationSpec assembles a CreationSpec, guarding required identity and execution fields.
 func NewCreationSpec(args *CreationSpecArgs) (CreationSpec, error) {
 	id := args.Identifiers
-	if id.SessionID == uuid.Nil || id.ProjectID == uuid.Nil || id.SpecID == uuid.Nil {
+	if id.SessionID == uuid.Nil || id.ProjectID == uuid.Nil {
 		return CreationSpec{}, errordef.Errorf(errordef.InvalidInput, "kernel creation spec identifiers are incomplete")
 	}
 	if args.Execution.Image == (ImageRef{}) {

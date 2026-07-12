@@ -8,9 +8,8 @@ import (
 
 // Spec is the immutable, finalized input used to create a Session.
 //
-// A Spec is persisted independently of any Session it spawns, so the same Spec
-// can be referenced by multiple Sessions. The Spec captures what to run; the Session
-// captures the act of running it.
+// A Spec is finalized before submission and persisted as part of exactly one
+// Session. It captures the immutable execution definition owned by that Session.
 type Spec struct {
 	ID              uuid.UUID       `json:"id"`
 	ProjectID       uuid.UUID       `json:"project_id"`

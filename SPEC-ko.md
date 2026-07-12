@@ -146,8 +146,9 @@ preset default가 적용되기 전일 수 있다.
 
 ### SessionSpec
 
-검증과 default 적용을 마친 immutable 실행 정의다. 동일한 SessionSpec은 재현을
-위해 다시 사용할 수 있어야 한다.
+검증과 default 적용을 마친 immutable 실행 정의다. 하나의 Session이 이 정의를
+실행 시점의 snapshot으로 직접 소유한다. 재현할 때는 확정된 정의를 복사해 새로운
+Session을 생성한다.
 
 ### Preset
 
@@ -167,7 +168,7 @@ Fine-tuning, notebook, evaluation, serving은 서로 다른 최상위 실행 객
 SessionSpecDraft
   → validation / preset resolution
   → immutable SessionSpec
-  → Session persistence
+  → 실행 정의를 포함한 Session persistence
   → scheduling and resource allocation
   → kernel.CreationSpec
   → Agent runtime
