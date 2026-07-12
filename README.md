@@ -8,6 +8,8 @@ notebooks, submitted code, training, evaluation, and inference sessions. Phase
 and executes one-GPU LoRA fine-tuning sessions from validated presets.
 
 See [`SPEC.md`](SPEC.md) for the product and architecture direction.
+See [`docs/design/0003-mvp-batch-session-user-scenario.md`](docs/design/0003-mvp-batch-session-user-scenario.md)
+for the end-to-end MVP feature checklist and current implementation status.
 
 ## Agent Guidance
 
