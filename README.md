@@ -1,8 +1,11 @@
 # Nano Backend.AI
 
-A small Go backend for an agent-native fine-tuning ledger.
+A small Go backend for agent-native model development and compute sessions.
 
-Phase 0 is intentionally narrow: it targets a single machine with 2x RTX 3090 GPUs and executes one-GPU LoRA fine-tuning sessions from validated presets. The goal is not to expose a generic job runner; the goal is to make training sessions submit-able, inspectable, and reproducible by AI agents.
+The long-term goal is to let AI agents develop models through interactive
+notebooks, submitted code, training, evaluation, and inference sessions. Phase
+0 is intentionally narrower: it targets a single machine with 2x RTX 3090 GPUs
+and executes one-GPU LoRA fine-tuning sessions from validated presets.
 
 See [`SPEC.md`](SPEC.md) for the full MVP contract.
 
@@ -24,6 +27,33 @@ Use `.claude/skills/README.md` for the available project workflows and skills.
 - Preserve logs, config, metrics, and artifacts for every terminal session
 - Make failures machine-readable through explicit session status and result and `failure_reason`
 
+## Domain Model
+
+The compute vocabulary follows Backend.AI:
+
+```text
+Project
+  └─ AgentTask              # future: a long-running goal delegated to an AI agent
+      └─ Experiment         # future: related development attempts and comparisons
+          └─ Session        # user-visible compute lifecycle
+              └─ Kernel     # isolated unit created by an Agent
+```
+
+Phase 0 persists `Project` and `Session` data and defines the manager-agent `Kernel` contract.
+`AgentTask` and `Experiment` are reserved boundaries for future orchestration;
+they will be introduced only when their lifecycle requirements are concrete.
+
+Sessions use Backend.AI-aligned types:
+
+- `interactive` — Jupyter, shell, or development environment
+- `batch` — finite training, evaluation, or submitted-code execution
+- `inference` — model-serving runtime
+- `system` — platform-internal computation
+
+Fine-tuning is a batch-session purpose, not the platform's top-level execution
+abstraction. See [`docs/design/0002-backend-ai-terminology.md`](docs/design/0002-backend-ai-terminology.md)
+for the canonical glossary.
+
 ## API Design Philosophy
 
 AI agents are the primary consumer. Responses should be machine-readable first:
@@ -42,10 +72,17 @@ SessionSpecDraft
   -> SQLite session ledger
   -> SchedulerCoordinator
   -> SessionProvisioner / GPU claim
-  -> KernelCreationSpec
+  -> kernel.CreationSpec
   -> KernelLauncher
   -> DockerRuntime
   -> local artifact store
+```
+
+Session lifecycle and execution outcome are separate:
+
+```text
+pending -> preparing -> running -> terminated
+                                  -> result: success | failure
 ```
 
 | Component | Role |

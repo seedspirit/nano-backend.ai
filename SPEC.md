@@ -18,7 +18,10 @@ Hard constraints:
 | Object | Description |
 |--------|-------------|
 | **Project** | A namespace for related sessions (e.g. `mergeowl`). |
-| **Session** | One execution of a fine-tuning job, fully specified by an immutable Spec. |
+| **AgentTask** | Future orchestration boundary for a long-running goal delegated to an AI agent. |
+| **Experiment** | Future grouping for related development attempts, comparisons, and artifacts. |
+| **Session** | A user-visible compute lifecycle, fully specified by an immutable session Spec. |
+| **Kernel** | An isolated compute unit created by an Agent for a Session. |
 | **TrainerPreset** | A validated trainer contract (stable ID, runtime, defaults, option policy). |
 | **ArtifactIndex** | Platform-maintained index of files produced by a session. |
 | **Asset** | External reference to a model or dataset (HF Hub URI, local path). |
@@ -29,6 +32,7 @@ A Session is created by submitting a `draft.Draft`. The platform reads the selec
 
 ```yaml
 project_id: 4e78df8a-bdb7-41e8-92d7-a1a9f26fd90c
+type: batch
 name: mergeowl-exp-42
 description: LoRA SFT experiment for MergeOwl v1
 preset_refs:
@@ -60,6 +64,7 @@ idempotency_key: mergeowl-exp-42   # optional, prevents duplicate submissions
 | Field | Required | Description |
 |-------|----------|-------------|
 | `project_id` | yes | Target project UUID. Human-friendly lookup can be provided by CLI/search. |
+| `type` | yes | Session operating mode: `interactive`, `batch`, `inference`, or `system`. Phase 0 submissions use `batch`. |
 | `name` | yes | Human-readable spec name. |
 | `description` | no | Human-readable description. |
 | `preset_refs.trainer` | no | Optional stable trainer preset UUID. Required when using the Phase 0 preset-backed spec builder. |
@@ -143,8 +148,8 @@ pending → preparing → running → terminated
 The Go domain model represents status changes with a `Transition` value:
 
 ```go
-r.Transition(session.Next(session.Preparing), now)
-r.Transition(session.Fail("trainer_error"), now)
+s.Transition(session.Next(session.Preparing), now)
+s.Transition(session.Fail("trainer_error"), now)
 ```
 
 `Next` is used for ordinary transitions. `Fail` is the only constructor that attaches a `FailureReason`, so callers cannot accidentally attach failure metadata to non-failed statuses.
@@ -158,17 +163,17 @@ The platform treats Docker as an agent-side kernel substrate, not as a user-faci
 | Component | Responsibility | Knows Docker? |
 |-----------|----------------|---------------|
 | SpecBuilder | Finalize a submitted `draft.Draft` into an immutable `spec.Spec` for one submission mode. | No |
-| ScheduleCoordinator | Own session lifecycle transitions, call provisioning/launch ports, and reconcile terminal state. | No |
-| SessionProvisioner | Claim capacity, choose the agent/GPU/storage binding, and build a `KernelCreationSpec`. | No |
+| SchedulerCoordinator | Own session lifecycle transitions, call provisioning/launch ports, and reconcile terminal state. | No |
+| SessionProvisioner | Claim capacity, choose the agent/GPU/storage binding, and build a `kernel.CreationSpec`. | No |
 | KernelLauncher | Manager-side port for preparing, starting, and cleaning up a kernel. | No |
 | HTTPKernelLauncher | First concrete manager-to-agent REST client adapter for `KernelLauncher`. | Transport only |
 | DockerRuntime | Agent-internal implementation that materializes the kernel as a Docker container. | Yes |
 
-MVP does not need a general scheduler framework, handler DSL, or external hint store. A small `ScheduleCoordinator` plus repository state is sufficient for the single-node Phase 0 target.
+MVP does not need a general scheduler framework, handler DSL, or external hint store. A small `SchedulerCoordinator` plus repository state is sufficient for the single-node Phase 0 target.
 
-### KernelCreationSpec
+### kernel.CreationSpec
 
-`KernelCreationSpec` is the fully bound kernel creation request created after a pending session has been selected and capacity has been claimed. It contains the values the agent needs to prepare and start the trainer container:
+`kernel.CreationSpec` is the fully bound kernel creation request created after a pending session has been selected and capacity has been claimed. It contains the values the agent needs to prepare and start the trainer container:
 
 - Session, project, and spec IDs
 - Trainer image ref, entrypoint/command, and environment
@@ -177,7 +182,7 @@ MVP does not need a general scheduler framework, handler DSL, or external hint s
 - Agent-visible workspace, cache, artifact, log, and config paths or refs
 - Timeout and output expectations needed for Phase 0 validation
 
-`KernelCreationSpec` must not contain Docker SDK types, raw Docker container config, or manager-local filesystem assumptions. The agent-side backend may translate it into Docker-specific options only after the manager-agent boundary.
+`kernel.CreationSpec` must not contain Docker SDK types, raw Docker container config, or manager-local filesystem assumptions. The agent-side backend may translate it into Docker-specific options only after the manager-agent boundary.
 
 ### KernelLauncher Contract
 
@@ -185,15 +190,17 @@ The initial public port is intentionally small:
 
 ```go
 type KernelLauncher interface {
-    Prepare(ctx context.Context, plan KernelCreationSpec) (KernelID, error)
-    Start(ctx context.Context, ref KernelID) error
-    Cleanup(ctx context.Context, ref KernelID) error
+    Prepare(ctx context.Context, spec kernel.CreationSpec) (kernel.ID, error)
+    Start(ctx context.Context, id kernel.ID) error
+    Cleanup(ctx context.Context, id kernel.ID) error
 }
 ```
 
-`KernelID` is an opaque reference to an agent-side prepared kernel. It should carry enough identity to route later calls, such as session ID, agent ID, and an kernel ID, without exposing a Docker container ID as a manager-domain concept.
+`kernel.ID` references an agent-side prepared kernel. It carries the session ID,
+agent ID, and agent-assigned kernel ID needed to route later calls without
+exposing a Docker container ID as a manager-domain concept.
 
-`Wait`, `Inspect`, `StreamLogs`, `Remove`, and explicit image-management methods are not part of this initial port. The launcher triggers and materializes work; the `ScheduleCoordinator` owns terminal observation, failure mapping, and finalization through a reconcile path.
+`Wait`, `Inspect`, `StreamLogs`, `Remove`, and explicit image-management methods are not part of this initial port. The launcher triggers and materializes work; the `SchedulerCoordinator` owns terminal observation, failure mapping, and finalization through a reconcile path.
 
 ### Manager-Agent Boundary
 
@@ -203,7 +210,7 @@ Initial kernel endpoints:
 
 | Method | Path | Meaning |
 |--------|------|---------|
-| POST | `/v1/kernels/prepare` | Materialize a `KernelCreationSpec` into a prepared agent-side kernel and return a `KernelID`. |
+| POST | `/v1/kernels/prepare` | Materialize a `kernel.CreationSpec` into a prepared agent-side kernel and return a `KernelID`. |
 | POST | `/v1/kernels/{kernel_id}/start` | Start the prepared kernel. |
 | POST | `/v1/kernels/{kernel_id}/cleanup` | Best-effort cleanup after terminal or preparation failure paths. |
 | GET | `/v1/kernels/{kernel_id}/status` | Return minimal observed status, exit code, OOM/timeout signals, and failure detail where available. |
@@ -215,7 +222,7 @@ HTTP request/response DTOs belong at the transport boundary. They must not leak 
 The Docker kernel runtime implements only the Phase 0 operations needed behind the agent API:
 
 - Pull or verify the trainer image during preparation
-- Create the container from the bound `KernelCreationSpec`
+- Create the container from the bound `kernel.CreationSpec`
 - Start the container
 - Observe container exit, exit code, timeout, and OOM where detectable
 - Preserve stdout/stderr and partial artifacts
@@ -246,7 +253,7 @@ This gives the agent a clear signal without parsing raw Docker stderr.
 ### Extension Path
 
 - **Phase 2**: Cancel (SIGTERM to SIGKILL timeout), OOM detection hardening, orphan cleanup.
-- **Phase 3**: Multi-node scheduling by binding `agent_id + agent endpoint + gpu_index` in `KernelCreationSpec`.
+- **Phase 3**: Multi-node scheduling by binding `agent_id + agent endpoint + gpu_index` in `kernel.CreationSpec`.
 - **Phase 4**: Cache and volume policy through a storage planner that binds concrete agent-visible paths before launch.
 
 ## 5. Failure Taxonomy
@@ -270,13 +277,13 @@ The Go domain type intentionally starts with only `type FailureReason string`. C
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/sessions` | Submit a session draft. Returns `{session_id, status}`. |
-| GET | `/sessions/{id}` | Full session record including spec and status. |
-| GET | `/sessions/{id}/logs` | Tail logs with cursor pagination. |
-| GET | `/projects/{id}/sessions` | List recent sessions for a project. |
-| GET | `/artifacts/{session_id}/{path}` | Download an artifact file. |
+| POST | `/v1/sessions` | Submit a session spec draft. Returns the created session summary. |
+| GET | `/v1/sessions/{id}/spec` | Get the finalized spec associated with a session. |
+| GET | `/v1/sessions/{id}/logs` | Planned: tail logs with cursor pagination. |
+| GET | `/v1/projects/{id}/sessions` | List recent sessions for a project. |
+| GET | `/v1/artifacts/{session_id}/{path}` | Planned: download an artifact file. |
 
-`POST /sessions/{id}/cancel` is deferred to Phase 2.
+`POST /v1/sessions/{id}/cancel` is deferred to Phase 2.
 
 ### 6.1 Validation Architecture
 
@@ -299,12 +306,12 @@ Validation happens in two layers:
 - The core is the single source of truth for session creation rules.
 - New entry points (CLI, batch submitter, future k8s controller) must route through the same core validator.
 
-**RunSpec finalization**
+**SessionSpec finalization**
 - `specbuilder.Builder` is the common interface for finalizing one submitted `draft.Draft` mode into an immutable `spec.Spec`.
 - `specbuilder.PresetBacked` implements preset-backed spec building: preset lookup, validation, and finalization.
 - `specbuilder.PresetBacked` depends on `PresetRegistry` and `specbuilder.Validator` interfaces rather than concrete implementations.
 - `specbuilder.Validator` validates a `specbuilder.Candidate` (`Draft + Presets`) only; it does not merge defaults or produce finalized output.
-- `FinalizeRunSpec` accepts a validated candidate, applies preset data and user parameters, and returns the immutable `spec.Spec`.
+- `FinalizeSessionSpec` accepts a validated candidate, applies preset data and user parameters, and returns the immutable `spec.Spec`.
 - Submitted `preset_refs` are nullable in `draft.Draft`; preset-backed spec building reads the selected preset data and carries the refs into `spec.Spec` as provenance.
 - The submit/API layer chooses the builder for the submission mode; raw/custom submission should use a separate builder instead of adding mode branches inside `specbuilder.PresetBacked`.
 
@@ -318,7 +325,7 @@ Validation happens in two layers:
 No WebSocket. Cursor-based tail for simple agent polling and retries:
 
 ```
-GET /sessions/{id}/logs?stream=stdout&cursor=1234&limit=200
+GET /v1/sessions/{id}/logs?stream=stdout&cursor=1234&limit=200
 ```
 
 Response:
@@ -334,7 +341,7 @@ Response:
 
 ## 7. Artifact Contract
 
-Every successful (or failed) session must write the following to its artifact directory:
+Every terminated session, whether successful or failed, must write the following to its artifact directory:
 
 ```
 /artifacts/{project_id}/{session_id}/
@@ -372,7 +379,7 @@ Every preset must produce a `metrics.json` with at minimum the following fields.
     "gpu_name": "NVIDIA GeForce RTX 3090"
   },
   "outcome": {
-    "status": "succeeded",
+    "result": "success",
     "epochs_completed": 3
   }
 }
@@ -389,7 +396,7 @@ Every preset must produce a `metrics.json` with at minimum the following fields.
 | `eval.dataset_name` | no | Which split or dataset was used for eval. |
 | `system.max_gpu_mem_mb` | yes | Peak VRAM observed during training. |
 | `system.gpu_name` | no | GPU model for reproducibility notes. |
-| `outcome.status` | yes | `succeeded` or `failed`. |
+| `outcome.result` | yes | `success` or `failure`. |
 | `outcome.epochs_completed` | yes | How many epochs actually finished. |
 
 `eval` is optional but when present must follow the same shape. This lets agents compare sessions that used eval against sessions that did not without schema drift.
@@ -480,9 +487,9 @@ MVP uses local filesystem only. The artifact store is behind a narrow driver int
 
 ```go
 type StorageDriver interface {
-    Write(runID, path string, r io.Reader) error
-    Read(runID, path string) (io.ReadCloser, error)
-    List(runID string) (ArtifactIndex, error)
+    Write(sessionID, path string, r io.Reader) error
+    Read(sessionID, path string) (io.ReadCloser, error)
+    List(sessionID string) (ArtifactIndex, error)
 }
 ```
 
@@ -513,6 +520,7 @@ CREATE TABLE projects (
 CREATE TABLE specs (
     id TEXT PRIMARY KEY,
     project_id TEXT NOT NULL REFERENCES projects(id),
+    type TEXT NOT NULL DEFAULT 'batch',
     name TEXT NOT NULL,
     description TEXT,
     model_options TEXT NOT NULL,    -- JSON
@@ -572,7 +580,9 @@ CREATE TABLE sessions (
     id TEXT PRIMARY KEY,
     project_id TEXT NOT NULL REFERENCES projects(id),
     spec_id TEXT NOT NULL REFERENCES specs(id),
+    type TEXT NOT NULL DEFAULT 'batch',
     status TEXT NOT NULL,
+    result TEXT NOT NULL DEFAULT 'undefined',
     failure_reason TEXT,
     artifact_path TEXT,
     assigned_agent_id TEXT,
