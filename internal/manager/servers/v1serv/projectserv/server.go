@@ -17,6 +17,8 @@ func WithSubServer(g *echo.Group, args Args) error {
 		return err
 	}
 	projectGroup := g.Group("/projects")
+	projectGroup.POST("", handler.create)
+	projectGroup.GET("/:id", handler.get)
 	projectGroup.GET("/:id/sessions", handler.listSessions)
 	return nil
 }

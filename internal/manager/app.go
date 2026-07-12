@@ -6,6 +6,7 @@ import (
 	"github.com/seedspirit/nano-backend.ai/internal/manager/repository"
 	"github.com/seedspirit/nano-backend.ai/internal/manager/servers"
 	"github.com/seedspirit/nano-backend.ai/internal/manager/service"
+	"github.com/seedspirit/nano-backend.ai/internal/manager/service/projectsvc"
 	"github.com/seedspirit/nano-backend.ai/internal/manager/service/sessionsvc"
 	"github.com/seedspirit/nano-backend.ai/internal/manager/sessionspec/preset"
 	"github.com/seedspirit/nano-backend.ai/internal/manager/sessionspec/specbuilder"
@@ -39,10 +40,12 @@ func NewApp(ctx context.Context, args Args) (*App, error) {
 		Validator: validator.Noop{},
 	}
 
-	services := service.NewServices().WithSessionService(sessionsvc.Args{
-		Repositories: repositories,
-		SpecBuilder:  builder,
-	})
+	services := service.NewServices().
+		WithProjectService(projectsvc.Args{Repositories: repositories}).
+		WithSessionService(sessionsvc.Args{
+			Repositories: repositories,
+			SpecBuilder:  builder,
+		})
 	server, err := servers.NewServer(servers.ServerArgs{
 		Addr:     args.Addr,
 		Services: services,

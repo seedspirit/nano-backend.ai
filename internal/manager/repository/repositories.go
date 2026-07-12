@@ -13,24 +13,39 @@ type Args struct {
 
 // Repositories groups concrete manager repository instances.
 type Repositories struct {
+	Project *db.ProjectRepository
 	Session *db.SessionRepository
 }
 
 // NewRepositories opens and migrates the configured persistence backends.
 func NewRepositories(ctx context.Context, args Args) (*Repositories, error) {
-	sessionRepo, err := db.NewSessionRepository(ctx, db.Args{
+	projectRepo, err := db.NewProjectRepository(ctx, db.Args{
 		DBPath: args.DBPath,
 	})
 	if err != nil {
 		return nil, err
 	}
 
+	sessionRepo, err := db.NewSessionRepository(ctx, db.Args{
+		DBPath: args.DBPath,
+	})
+	if err != nil {
+		_ = projectRepo.Close()
+		return nil, err
+	}
+
 	return &Repositories{
+		Project: projectRepo,
 		Session: sessionRepo,
 	}, nil
 }
 
 // Close releases resources owned by the repositories.
 func (r *Repositories) Close() error {
-	return r.Session.Close()
+	projectErr := r.Project.Close()
+	sessionErr := r.Session.Close()
+	if projectErr != nil {
+		return projectErr
+	}
+	return sessionErr
 }

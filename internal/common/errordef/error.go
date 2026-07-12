@@ -33,6 +33,10 @@ var (
 	ValidationError = ErrorCode{code: "validation_error", statusCode: http.StatusUnprocessableEntity}
 	// InvalidSessionID indicates that a session ID path parameter is not a UUID.
 	InvalidSessionID = ErrorCode{code: "invalid_session_id", statusCode: http.StatusBadRequest}
+	// InvalidProjectID indicates that a project ID path parameter is not a UUID.
+	InvalidProjectID = ErrorCode{code: "invalid_project_id", statusCode: http.StatusBadRequest}
+	// ProjectNameConflict indicates that a project name is already in use.
+	ProjectNameConflict = ErrorCode{code: "project_name_conflict", statusCode: http.StatusConflict}
 	// Internal indicates an unexpected manager error.
 	Internal = ErrorCode{code: "internal_error", statusCode: http.StatusInternalServerError}
 	// NotImplemented indicates that a requested operation is not implemented.
@@ -56,6 +60,10 @@ var (
 	ErrValidation = Error(ValidationError, "validation failed")
 	// ErrInvalidSessionID is the sentinel error for InvalidSessionID.
 	ErrInvalidSessionID = Error(InvalidSessionID, "session ID must be a UUID")
+	// ErrInvalidProjectID is the sentinel error for InvalidProjectID.
+	ErrInvalidProjectID = Error(InvalidProjectID, "project ID must be a UUID")
+	// ErrProjectNameConflict is the sentinel error for ProjectNameConflict.
+	ErrProjectNameConflict = Error(ProjectNameConflict, "project name already exists")
 	// ErrInternal is the sentinel error for Internal.
 	ErrInternal = Error(Internal, "internal error")
 	// ErrNotImplemented is the sentinel error for NotImplemented.
