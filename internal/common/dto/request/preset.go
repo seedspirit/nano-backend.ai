@@ -2,7 +2,7 @@ package request
 
 import (
 	"github.com/google/uuid"
-	"github.com/seedspirit/nano-backend.ai/internal/common/data/session/preset"
+	"github.com/seedspirit/nano-backend.ai/internal/common/data/session"
 )
 
 // PresetRefsReq selects optional preset categories by ID in a submitted request.
@@ -12,8 +12,8 @@ type PresetRefsReq struct {
 	Output   *uuid.UUID `json:"output,omitempty"`
 }
 
-func presetRefsToDraft(req PresetRefsReq) preset.Refs {
-	return preset.Refs{
+func presetRefsToDraft(req PresetRefsReq) session.PresetRefs {
+	return session.PresetRefs{
 		Trainer:  req.Trainer,
 		Resource: req.Resource,
 		Output:   req.Output,

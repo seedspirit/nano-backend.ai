@@ -8,7 +8,6 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/seedspirit/nano-backend.ai/internal/common/data/session"
-	"github.com/seedspirit/nano-backend.ai/internal/common/data/session/aggregate"
 	"github.com/seedspirit/nano-backend.ai/internal/common/data/session/draft"
 	"github.com/seedspirit/nano-backend.ai/internal/common/data/session/spec"
 	"github.com/seedspirit/nano-backend.ai/internal/common/errordef"
@@ -37,7 +36,7 @@ func (r *stubRunRepo) ProjectExists(ctx context.Context, projectID uuid.UUID) er
 	return r.projectExistsErr
 }
 
-func (r *stubRunRepo) CreateSession(ctx context.Context, target *aggregate.Session) error {
+func (r *stubRunRepo) CreateSession(ctx context.Context, target *session.Session) error {
 	r.created = true
 	r.spec = &target.Definition
 	return r.createRunErr

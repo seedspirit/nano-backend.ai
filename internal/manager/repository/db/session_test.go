@@ -9,8 +9,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/seedspirit/nano-backend.ai/internal/common/data/session"
-	"github.com/seedspirit/nano-backend.ai/internal/common/data/session/aggregate"
-	"github.com/seedspirit/nano-backend.ai/internal/common/data/session/preset"
 	"github.com/seedspirit/nano-backend.ai/internal/common/data/session/spec"
 	"github.com/seedspirit/nano-backend.ai/internal/common/errordef"
 	sessionspecpreset "github.com/seedspirit/nano-backend.ai/internal/manager/sessionspec/preset"
@@ -338,13 +336,13 @@ func TestCreateSessionPersistsSpecAndSession(t *testing.T) {
 	fixture := newSessionRepositoryFixture(t)
 	projectID := fixture.givenProject()
 	specValue := sampleSpec(projectID)
-	target := aggregate.New(specValue)
+	target := session.NewPending(specValue)
 
 	if err := fixture.repo.CreateSession(fixture.ctx, &target); err != nil {
 		t.Fatalf("create session: %v", err)
 	}
 
-	gotSpec, err := fixture.repo.GetSpec(fixture.ctx, target.Record.ID)
+	gotSpec, err := fixture.repo.GetSpec(fixture.ctx, target.ID)
 	if err != nil {
 		t.Fatalf("get spec by session id: %v", err)
 	}
@@ -356,23 +354,11 @@ func TestCreateSessionPersistsSpecAndSession(t *testing.T) {
 	}
 }
 
-func TestCreateSessionRejectsMismatchedDefinitionID(t *testing.T) {
-	fixture := newSessionRepositoryFixture(t)
-	projectID := fixture.givenProject()
-	specValue := sampleSpec(projectID)
-	target := aggregate.New(specValue)
-	target.Record.ID = uuid.New()
-
-	if err := fixture.repo.CreateSession(fixture.ctx, &target); err == nil {
-		t.Fatal("got nil error for mismatched session definition ID")
-	}
-}
-
 func TestCreateSessionRollsBackOnProjectFKViolation(t *testing.T) {
 	fixture := newSessionRepositoryFixture(t)
 	missingProjectID := uuid.New()
 	specValue := sampleSpec(missingProjectID)
-	target := aggregate.New(specValue)
+	target := session.NewPending(specValue)
 
 	err := fixture.repo.CreateSession(fixture.ctx, &target)
 	if err == nil {
@@ -383,7 +369,7 @@ func TestCreateSessionRollsBackOnProjectFKViolation(t *testing.T) {
 		query string
 		arg   string
 	}{
-		{`SELECT COUNT(*) FROM sessions WHERE id = ?`, target.Record.ID.String()},
+		{`SELECT COUNT(*) FROM sessions WHERE id = ?`, target.ID.String()},
 	} {
 		var n int
 		if err := fixture.repo.db.GetContext(fixture.ctx, &n, kv.query, kv.arg); err != nil {
@@ -415,17 +401,17 @@ func sampleSpec(projectID uuid.UUID) spec.Spec {
 		ProjectID:    projectID,
 		Name:         "submission-1",
 		Description:  "",
-		PresetRefs:   preset.Refs{Trainer: &trainerID},
-		ModelOptions: spec.ModelOptions{BaseModel: "meta-llama/Llama-3-8B"},
-		DataOptions: spec.DataOptions{
-			Datasets: []spec.DatasetRef{{Path: "tatsu-lab/alpaca", Split: "train"}},
+		PresetRefs:   session.PresetRefs{Trainer: &trainerID},
+		ModelOptions: session.ModelOptions{BaseModel: "meta-llama/Llama-3-8B"},
+		DataOptions: session.DataOptions{
+			Datasets: []session.DatasetRef{{Path: "tatsu-lab/alpaca", Split: "train"}},
 		},
-		ResourceOptions: spec.ResourceOptions{
+		ResourceOptions: session.ResourceOptions{
 			GPU:     session.GPUOptions{Count: 1},
 			Memory:  session.MemoryOptions{LimitBytes: 1 << 30},
 			Timeout: session.TimeoutOptions{DurationSeconds: 3600},
 		},
-		TrainingOptions: spec.TrainingOptions{
+		TrainingOptions: session.TrainingOptions{
 			Parameters: map[string]any{
 				"learning_rate": 0.0002,
 				"num_epochs":    3,

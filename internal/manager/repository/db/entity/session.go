@@ -63,9 +63,11 @@ func (r *Session) ToData() (session.Session, error) {
 	}
 
 	result := session.Session{
-		ID:        id,
-		ProjectID: projectID,
-		Type:      session.Type(r.Type),
+		Definition: session.Definition{
+			ID:        id,
+			ProjectID: projectID,
+			Type:      session.Type(r.Type),
+		},
 		Lifecycle: lifecycle,
 	}
 	if r.IdempotencyKey.Valid {

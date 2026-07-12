@@ -2,19 +2,24 @@
 // shapes, and the artifact index produced by a completed Session.
 package session
 
-import (
-	"time"
-
-	"github.com/google/uuid"
-)
+import "time"
 
 // Session represents a single execution and owns its finalized definition.
 type Session struct {
-	ID             uuid.UUID `json:"id"`
-	ProjectID      uuid.UUID `json:"project_id"`
-	Type           Type      `json:"type"`
+	Definition
 	IdempotencyKey *string   `json:"idempotency_key,omitempty"`
 	Lifecycle      Lifecycle `json:"lifecycle"`
+}
+
+// NewPending creates a Session from its finalized definition.
+func NewPending(definition Definition) Session { //nolint:gocritic // The Session intentionally owns an immutable definition copy.
+	if definition.Type == "" {
+		definition.Type = Batch
+	}
+	return Session{
+		Definition: definition,
+		Lifecycle:  NewLifecycle(time.Now()),
+	}
 }
 
 // Transition applies a lifecycle transition to the Session.

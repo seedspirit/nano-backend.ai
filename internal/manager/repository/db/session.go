@@ -9,7 +9,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/seedspirit/nano-backend.ai/internal/common/data/session"
-	"github.com/seedspirit/nano-backend.ai/internal/common/data/session/aggregate"
 	"github.com/seedspirit/nano-backend.ai/internal/common/data/session/preset"
 	"github.com/seedspirit/nano-backend.ai/internal/common/data/session/spec"
 	"github.com/seedspirit/nano-backend.ai/internal/common/encoding"
@@ -134,18 +133,13 @@ func (r *SessionRepository) ProjectExists(ctx context.Context, projectID uuid.UU
 }
 
 // CreateSession persists a spec and a pending session in a single transaction.
-func (r *SessionRepository) CreateSession(ctx context.Context, target *aggregate.Session) error {
+func (r *SessionRepository) CreateSession(ctx context.Context, target *session.Session) error {
 	if target == nil {
 		return fmt.Errorf("session is required")
 	}
-	sessionSpec := &target.Definition
-	sessionRecord := &target.Record
-	if sessionSpec.ID != sessionRecord.ID {
-		return fmt.Errorf("session definition id %s does not match session id %s", sessionSpec.ID, sessionRecord.ID)
-	}
-	createdAt := encoding.FormatTime(sessionRecord.Lifecycle.CreatedAt)
+	createdAt := encoding.FormatTime(target.Lifecycle.CreatedAt)
 
-	specEntity, err := entity.FromData(sessionSpec, createdAt)
+	specEntity, err := entity.FromData(&target.Definition, createdAt)
 	if err != nil {
 		return fmt.Errorf("convert spec: %w", err)
 	}
@@ -156,7 +150,7 @@ func (r *SessionRepository) CreateSession(ctx context.Context, target *aggregate
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if err := insertSession(ctx, tx, &specEntity, sessionRecord, createdAt); err != nil {
+	if err := insertSession(ctx, tx, &specEntity, target, createdAt); err != nil {
 		return err
 	}
 
@@ -241,7 +235,7 @@ func (r *SessionRepository) getSpecTrainingParameters(ctx context.Context, specI
 	return rows, nil
 }
 
-func (r *SessionRepository) getSpecPresetRefs(ctx context.Context, specID uuid.UUID) (preset.Refs, error) {
+func (r *SessionRepository) getSpecPresetRefs(ctx context.Context, specID uuid.UUID) (session.PresetRefs, error) {
 	var rows []struct {
 		Category string `db:"category"`
 		PresetID string `db:"preset_id"`
@@ -251,14 +245,14 @@ func (r *SessionRepository) getSpecPresetRefs(ctx context.Context, specID uuid.U
 		FROM session_preset_refs
 		WHERE session_id = ?
 	`, specID.String()); err != nil {
-		return preset.Refs{}, fmt.Errorf("get spec preset refs %s: %w", specID, err)
+		return session.PresetRefs{}, fmt.Errorf("get spec preset refs %s: %w", specID, err)
 	}
 
-	var refs preset.Refs
+	var refs session.PresetRefs
 	for _, row := range rows {
 		id, err := uuid.Parse(row.PresetID)
 		if err != nil {
-			return preset.Refs{}, fmt.Errorf("parse preset id %q: %w", row.PresetID, err)
+			return session.PresetRefs{}, fmt.Errorf("parse preset id %q: %w", row.PresetID, err)
 		}
 		switch preset.Category(row.Category) {
 		case preset.TrainerPreset:
@@ -268,7 +262,7 @@ func (r *SessionRepository) getSpecPresetRefs(ctx context.Context, specID uuid.U
 		case preset.OutputPreset:
 			refs.Output = &id
 		default:
-			return preset.Refs{}, fmt.Errorf("unknown preset category %q", row.Category)
+			return session.PresetRefs{}, fmt.Errorf("unknown preset category %q", row.Category)
 		}
 	}
 	return refs, nil

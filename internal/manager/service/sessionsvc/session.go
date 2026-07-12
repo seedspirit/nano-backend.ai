@@ -6,7 +6,6 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/seedspirit/nano-backend.ai/internal/common/data/session"
-	"github.com/seedspirit/nano-backend.ai/internal/common/data/session/aggregate"
 	"github.com/seedspirit/nano-backend.ai/internal/common/data/session/draft"
 	"github.com/seedspirit/nano-backend.ai/internal/common/data/session/spec"
 	"github.com/seedspirit/nano-backend.ai/internal/common/errordef"
@@ -24,7 +23,7 @@ type SessionRepository interface {
 	GetSpec(ctx context.Context, id uuid.UUID) (spec.Spec, error)
 	ListProjectSessions(ctx context.Context, projectID uuid.UUID, limit int) ([]session.Session, error)
 	ProjectExists(ctx context.Context, projectID uuid.UUID) error
-	CreateSession(ctx context.Context, target *aggregate.Session) error
+	CreateSession(ctx context.Context, target *session.Session) error
 }
 
 // SpecBuilder finalizes a submitted draft into an immutable spec.
@@ -70,9 +69,9 @@ func (s *Service) Submit(ctx context.Context, sessionDraft *draft.Draft) (sessio
 		return session.Session{}, err
 	}
 
-	target := aggregate.New(built)
+	target := session.NewPending(built)
 	if err := s.repo.CreateSession(ctx, &target); err != nil {
 		return session.Session{}, err
 	}
-	return target.Record, nil
+	return target, nil
 }
