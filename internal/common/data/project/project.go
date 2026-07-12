@@ -1,4 +1,4 @@
-// Package project defines the Project entity that wraps related runs.
+// Package project defines the Project entity that wraps related sessions.
 package project
 
 import (
@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// Project groups related run specs and executions.
+// Project groups related session specs and executions.
 type Project struct {
 	ID          uuid.UUID `json:"id"`
 	Name        string    `json:"name"`

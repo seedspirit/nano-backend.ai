@@ -6,11 +6,11 @@ import (
 	"os/exec"
 	"sync"
 
-	"github.com/seedspirit/nano-backend.ai/internal/common/kernel"
+	"github.com/seedspirit/nano-backend.ai/internal/agent/runtime"
 )
 
-// Compile-time verification that LocalProcess implements kernel.Runtime.
-var _ kernel.Runtime = (*LocalProcess)(nil)
+// Compile-time verification that LocalProcess implements runtime.Runtime.
+var _ runtime.Runtime = (*LocalProcess)(nil)
 
 // processEntry tracks a running child process.
 type processEntry struct {
@@ -18,37 +18,37 @@ type processEntry struct {
 	done chan struct{} // closed when cmd.Wait() returns
 }
 
-// LocalProcess implements kernel.Runtime by managing local OS processes.
+// LocalProcess implements runtime.Runtime by managing local OS processes.
 type LocalProcess struct {
 	mu        sync.Mutex
-	processes map[kernel.ID]*processEntry
+	processes map[runtime.ID]*processEntry
 }
 
 // NewLocalProcess creates a new LocalProcess runtime.
 func NewLocalProcess() *LocalProcess {
 	return &LocalProcess{
-		processes: make(map[kernel.ID]*processEntry),
+		processes: make(map[runtime.ID]*processEntry),
 	}
 }
 
-// Create launches a child process described by spec and returns its kernel ID.
-func (lp *LocalProcess) Create(ctx context.Context, spec kernel.Spec) (kernel.ID, error) {
+// Create launches a child process described by spec and returns its runtime ID.
+func (lp *LocalProcess) Create(ctx context.Context, spec runtime.Spec) (runtime.ID, error) {
 	if len(spec.Command) == 0 {
-		return kernel.ID{}, &kernel.Error{
+		return runtime.ID{}, &runtime.Error{
 			Op:  "create",
-			Err: fmt.Errorf("empty command: %w", kernel.ErrRuntime),
+			Err: fmt.Errorf("empty command: %w", runtime.ErrRuntime),
 		}
 	}
 
-	cmd := exec.CommandContext(ctx, spec.Command[0], spec.Command[1:]...) //nolint:gosec // command comes from trusted kernel.Spec
+	cmd := exec.CommandContext(ctx, spec.Command[0], spec.Command[1:]...) //nolint:gosec // command comes from trusted runtime.Spec
 	if err := cmd.Start(); err != nil {
-		return kernel.ID{}, &kernel.Error{
+		return runtime.ID{}, &runtime.Error{
 			Op:  "create",
-			Err: fmt.Errorf("%s: %w", err, kernel.ErrRuntime),
+			Err: fmt.Errorf("%s: %w", err, runtime.ErrRuntime),
 		}
 	}
 
-	id := kernel.NewID()
+	id := runtime.NewID()
 	entry := &processEntry{
 		cmd:  cmd,
 		done: make(chan struct{}),
@@ -68,15 +68,15 @@ func (lp *LocalProcess) Create(ctx context.Context, spec kernel.Spec) (kernel.ID
 }
 
 // Destroy terminates the process identified by id.
-func (lp *LocalProcess) Destroy(_ context.Context, id kernel.ID) error {
+func (lp *LocalProcess) Destroy(_ context.Context, id runtime.ID) error {
 	lp.mu.Lock()
 	entry, ok := lp.processes[id]
 	if !ok {
 		lp.mu.Unlock()
-		return &kernel.Error{
+		return &runtime.Error{
 			Op:  "destroy",
 			ID:  id,
-			Err: kernel.ErrNotFound,
+			Err: runtime.ErrNotFound,
 		}
 	}
 	lp.mu.Unlock()
@@ -90,10 +90,10 @@ func (lp *LocalProcess) Destroy(_ context.Context, id kernel.ID) error {
 			lp.mu.Unlock()
 			return nil
 		default:
-			return &kernel.Error{
+			return &runtime.Error{
 				Op:  "destroy",
 				ID:  id,
-				Err: fmt.Errorf("%s: %w", err, kernel.ErrRuntime),
+				Err: fmt.Errorf("%s: %w", err, runtime.ErrRuntime),
 			}
 		}
 	}
@@ -107,24 +107,24 @@ func (lp *LocalProcess) Destroy(_ context.Context, id kernel.ID) error {
 }
 
 // Status returns the current status of the process identified by id.
-func (lp *LocalProcess) Status(_ context.Context, id kernel.ID) (kernel.Status, error) {
+func (lp *LocalProcess) Status(_ context.Context, id runtime.ID) (runtime.Status, error) {
 	lp.mu.Lock()
 	entry, ok := lp.processes[id]
 	lp.mu.Unlock()
 
 	if !ok {
-		return kernel.Status{}, &kernel.Error{
+		return runtime.Status{}, &runtime.Error{
 			Op:  "status",
 			ID:  id,
-			Err: kernel.ErrNotFound,
+			Err: runtime.ErrNotFound,
 		}
 	}
 
 	select {
 	case <-entry.done:
 		// Process has exited; ProcessState is populated by cmd.Wait().
-		return kernel.Exited(entry.cmd.ProcessState.ExitCode()), nil
+		return runtime.Exited(entry.cmd.ProcessState.ExitCode()), nil
 	default:
-		return kernel.Running(), nil
+		return runtime.Running(), nil
 	}
 }

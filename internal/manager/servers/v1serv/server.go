@@ -3,7 +3,7 @@ package v1serv
 import (
 	"github.com/labstack/echo/v5"
 	"github.com/seedspirit/nano-backend.ai/internal/manager/servers/v1serv/projectserv"
-	"github.com/seedspirit/nano-backend.ai/internal/manager/servers/v1serv/runserv"
+	"github.com/seedspirit/nano-backend.ai/internal/manager/servers/v1serv/sessionserv"
 	"github.com/seedspirit/nano-backend.ai/internal/manager/service"
 )
 
@@ -15,7 +15,7 @@ type ServerArgs struct {
 // WithSubServer registers v1 API routes below the given group.
 func WithSubServer(g *echo.Group, args ServerArgs) error {
 	v1Group := g.Group("/v1")
-	if err := runserv.WithSubServer(v1Group, runserv.Args{
+	if err := sessionserv.WithSubServer(v1Group, sessionserv.Args{
 		Services: args.Services,
 	}); err != nil {
 		return err

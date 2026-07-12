@@ -6,9 +6,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/seedspirit/nano-backend.ai/internal/common/data/run"
-	"github.com/seedspirit/nano-backend.ai/internal/common/data/run/preset"
-	"github.com/seedspirit/nano-backend.ai/internal/common/data/run/spec"
+	"github.com/seedspirit/nano-backend.ai/internal/common/data/session"
+	"github.com/seedspirit/nano-backend.ai/internal/common/data/session/preset"
+	"github.com/seedspirit/nano-backend.ai/internal/common/data/session/spec"
 	"github.com/seedspirit/nano-backend.ai/internal/common/encoding"
 )
 
@@ -84,10 +84,10 @@ func (s *Spec) ToData() (spec.Spec, error) {
 			Datasets: datasets,
 		},
 		ResourceOptions: spec.ResourceOptions{
-			CPU:     run.CPUOptions{Cores: s.ResourceCPUCores},
-			GPU:     run.GPUOptions{Count: s.ResourceGPUCount},
-			Memory:  run.MemoryOptions{LimitBytes: s.ResourceMemoryLimitBytes},
-			Timeout: run.TimeoutOptions{DurationSeconds: s.ResourceTimeoutDurationSeconds},
+			CPU:     session.CPUOptions{Cores: s.ResourceCPUCores},
+			GPU:     session.GPUOptions{Count: s.ResourceGPUCount},
+			Memory:  session.MemoryOptions{LimitBytes: s.ResourceMemoryLimitBytes},
+			Timeout: session.TimeoutOptions{DurationSeconds: s.ResourceTimeoutDurationSeconds},
 		},
 		TrainingOptions: spec.TrainingOptions{
 			Parameters: parameters,

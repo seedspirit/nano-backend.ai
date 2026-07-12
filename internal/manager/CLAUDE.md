@@ -23,7 +23,7 @@ This directory owns manager application composition.
 - `service/` — manager use cases and consumer-owned repository interfaces.
 - `repository/` — persistence-facing contracts and repository registries used during wiring.
 - `repository/db/` — database-backed repository implementations and storage mapping.
-- `runspec/` — domain workflow for turning draft input and presets into finalized specs.
+- `session spec/` — domain workflow for turning draft input and presets into finalized specs.
 - `preset/` — manager-owned preset registry and fixture-backed preset data.
 
 ## Dependency Direction

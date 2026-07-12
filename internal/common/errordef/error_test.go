@@ -28,15 +28,15 @@ func TestErrorExposesCodeStatusAndMessage(t *testing.T) {
 }
 
 func TestErrorfFormatsMessage(t *testing.T) {
-	err := Errorf(NotFound, "run %s not found", "abc")
+	err := Errorf(NotFound, "session %s not found", "abc")
 
-	if err.Error() != "run abc not found" {
+	if err.Error() != "session abc not found" {
 		t.Fatalf("got message %q, want formatted message", err.Error())
 	}
 }
 
 func TestErrorsIsMatchesByCode(t *testing.T) {
-	err := Errorf(IdempotencyConflict, "existing run %s", "abc")
+	err := Errorf(IdempotencyConflict, "existing session %s", "abc")
 
 	if !errors.Is(err, ErrIdempotencyConflict) {
 		t.Fatalf("errors.Is did not match idempotency conflict code")

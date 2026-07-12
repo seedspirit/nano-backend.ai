@@ -76,9 +76,9 @@ job ID in `data`.
 - `internal/manager/repository/db/entity`: database mapping types used only by the DB implementation.
 - `internal/common/encoding`: shared encoding helpers; do not use as a place for business types.
 - `internal/common/kernel`: runtime-facing kernel types and ports; split data and ports before broadening its use.
-- `internal/manager/runspec`: manager-specific run spec preparation.
-- `internal/manager/runspec/preset`: preset catalog, policy, and registry behavior.
-- `internal/manager/runspec/specbuilder`: draft plus preset finalization workflow that builds immutable specs.
+- `internal/manager/session spec`: manager-specific session spec preparation.
+- `internal/manager/session spec/preset`: preset catalog, policy, and registry behavior.
+- `internal/manager/session spec/specbuilder`: draft plus preset finalization workflow that builds immutable specs.
 
 ## Go Server Structure
 

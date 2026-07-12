@@ -1,16 +1,16 @@
 package request
 
 import (
-	"github.com/seedspirit/nano-backend.ai/internal/common/data/run"
-	"github.com/seedspirit/nano-backend.ai/internal/common/data/run/draft"
+	"github.com/seedspirit/nano-backend.ai/internal/common/data/session"
+	"github.com/seedspirit/nano-backend.ai/internal/common/data/session/draft"
 )
 
-// ModelOptionsReq describes the requested base model for a run draft.
+// ModelOptionsReq describes the requested base model for a session spec draft.
 type ModelOptionsReq struct {
 	BaseModel string `json:"base_model"`
 }
 
-// DataOptionsReq describes the requested dataset(s) for a run draft.
+// DataOptionsReq describes the requested dataset(s) for a session spec draft.
 type DataOptionsReq struct {
 	Datasets []DatasetRefReq `json:"datasets"`
 }
@@ -21,12 +21,12 @@ type DatasetRefReq struct {
 	Split string `json:"split"`
 }
 
-// ResourceOptionsReq specifies requested compute resources for a run draft.
+// ResourceOptionsReq specifies requested compute resources for a session spec draft.
 type ResourceOptionsReq struct {
-	CPU     run.CPUOptions     `json:"cpu,omitempty"`
-	GPU     run.GPUOptions     `json:"gpu"`
-	Memory  run.MemoryOptions  `json:"memory"`
-	Timeout run.TimeoutOptions `json:"timeout"`
+	CPU     session.CPUOptions     `json:"cpu,omitempty"`
+	GPU     session.GPUOptions     `json:"gpu"`
+	Memory  session.MemoryOptions  `json:"memory"`
+	Timeout session.TimeoutOptions `json:"timeout"`
 }
 
 // TrainingOptionsReq holds user-provided training parameters.

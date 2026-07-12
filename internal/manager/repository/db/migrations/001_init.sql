@@ -131,12 +131,14 @@ CREATE TABLE IF NOT EXISTS spec_preset_refs (
     PRIMARY KEY(spec_id, category)
 );
 
-CREATE TABLE IF NOT EXISTS runs (
+CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
     project_id TEXT NOT NULL REFERENCES projects(id),
     spec_id TEXT NOT NULL REFERENCES specs(id),
+    type TEXT NOT NULL DEFAULT 'batch',
     idempotency_key TEXT,
     status TEXT NOT NULL,
+    result TEXT NOT NULL DEFAULT 'undefined',
     failure_reason TEXT,
     artifact_base_path TEXT,
     created_at TEXT NOT NULL,
@@ -145,15 +147,15 @@ CREATE TABLE IF NOT EXISTS runs (
     UNIQUE(project_id, idempotency_key)
 );
 
-CREATE INDEX IF NOT EXISTS idx_runs_project_created_at
-    ON runs(project_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_sessions_project_created_at
+    ON sessions(project_id, created_at);
 
 CREATE TABLE IF NOT EXISTS artifacts (
     id TEXT PRIMARY KEY,
-    run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+    session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
     path TEXT NOT NULL,
     size_bytes INTEGER NOT NULL,
     sha256 TEXT NOT NULL,
     created_at TEXT NOT NULL,
-    UNIQUE(run_id, path)
+    UNIQUE(session_id, path)
 );

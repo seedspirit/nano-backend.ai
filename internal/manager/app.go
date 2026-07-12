@@ -4,12 +4,12 @@ import (
 	"context"
 
 	"github.com/seedspirit/nano-backend.ai/internal/manager/repository"
-	"github.com/seedspirit/nano-backend.ai/internal/manager/runspec/preset"
-	"github.com/seedspirit/nano-backend.ai/internal/manager/runspec/specbuilder"
-	"github.com/seedspirit/nano-backend.ai/internal/manager/runspec/validator"
 	"github.com/seedspirit/nano-backend.ai/internal/manager/servers"
 	"github.com/seedspirit/nano-backend.ai/internal/manager/service"
-	"github.com/seedspirit/nano-backend.ai/internal/manager/service/runsvc"
+	"github.com/seedspirit/nano-backend.ai/internal/manager/service/sessionsvc"
+	"github.com/seedspirit/nano-backend.ai/internal/manager/sessionspec/preset"
+	"github.com/seedspirit/nano-backend.ai/internal/manager/sessionspec/specbuilder"
+	"github.com/seedspirit/nano-backend.ai/internal/manager/sessionspec/validator"
 )
 
 // Args configures the manager application.
@@ -39,7 +39,7 @@ func NewApp(ctx context.Context, args Args) (*App, error) {
 		Validator: validator.Noop{},
 	}
 
-	services := service.NewServices().WithRunService(runsvc.Args{
+	services := service.NewServices().WithSessionService(sessionsvc.Args{
 		Repositories: repositories,
 		SpecBuilder:  builder,
 	})
@@ -58,7 +58,7 @@ func NewApp(ctx context.Context, args Args) (*App, error) {
 	}, nil
 }
 
-// Start runs the manager server.
+// Start sessions the manager server.
 func (a *App) Start(ctx context.Context) error {
 	return a.server.Start(ctx)
 }

@@ -5,27 +5,27 @@
 
 ## 1. Purpose
 
-nano-backend.ai MVP is not a generic job runner. It is a **preset-validated fine-tuning ledger** that lets an ML researcher agent submit, track, and reproduce training runs with minimal infrastructure surface area.
+nano-backend.ai MVP is not a generic job runner. It is a **preset-validated fine-tuning ledger** that lets an ML researcher agent submit, track, and reproduce training sessions with minimal infrastructure surface area.
 
 Hard constraints:
 - Single node, 2× RTX 3090
 - Single-GPU jobs only (no distributed training)
 - Declarative submission via preset refs + option parameters
-- Every run must leave a complete, inspectable artifact set
+- Every session must leave a complete, inspectable artifact set
 
 ## 2. Core Objects
 
 | Object | Description |
 |--------|-------------|
-| **Project** | A namespace for related runs (e.g. `mergeowl`). |
-| **Run** | One execution of a fine-tuning job, fully specified by an immutable Spec. |
+| **Project** | A namespace for related sessions (e.g. `mergeowl`). |
+| **Session** | One execution of a fine-tuning job, fully specified by an immutable Spec. |
 | **TrainerPreset** | A validated trainer contract (stable ID, runtime, defaults, option policy). |
-| **ArtifactIndex** | Platform-maintained index of files produced by a run. |
+| **ArtifactIndex** | Platform-maintained index of files produced by a session. |
 | **Asset** | External reference to a model or dataset (HF Hub URI, local path). |
 
-## 3. RunDraft and Spec
+## 3. SessionSpecDraft and Spec
 
-A Run is created by submitting a `draft.Draft`. The platform reads the selected preset refs, validates the resulting `runspec.Candidate` (`Draft + Presets`), then produces an immutable `spec.Spec` with a structured `spec.TrainingOptions`.
+A Session is created by submitting a `draft.Draft`. The platform reads the selected preset refs, validates the resulting `sessionspec.Candidate` (`Draft + Presets`), then produces an immutable `spec.Spec` with a structured `spec.TrainingOptions`.
 
 ```yaml
 project_id: 4e78df8a-bdb7-41e8-92d7-a1a9f26fd90c
@@ -69,35 +69,35 @@ idempotency_key: mergeowl-exp-42   # optional, prevents duplicate submissions
 | `data_options.datasets` | yes | List of dataset references. |
 | `resource_options` | yes | Requested `cpu`, `gpu`, `memory`, and `timeout` values. |
 | `training_options.parameters` | no | User-provided training parameters. For preset-backed submissions, these are validated against the selected trainer preset's `OptionPolicy`. |
-| `idempotency_key` | no | Client-supplied key; duplicate returns existing run. |
+| `idempotency_key` | no | Client-supplied key; duplicate returns existing session. |
 
 `outputs` and `lineage` are planned extension groups. They should be added when artifact policy and traceability requirements become concrete enough to avoid removing public fields later.
 
 ### 3.1 Dataset / Model Staging Contract
 
-Before a run enters `running`, the platform must resolve all assets during `preparing`.
+Before a session enters `running`, the platform must resolve all assets during `preparing`.
 
 **Base model resolution**
 - `hf://<model_id>` or bare `<org>/<model>` → download via `huggingface_hub` into `HF_HOME` cache.
 - `local://<absolute_path>` → verify existence; mount read-only into container.
-- Cache hit: skip download, record `cache_hit=true` in run metadata.
-- Cache miss: download; if download fails, transition to `failed` with `failure_reason: model_download_failed`.
+- Cache hit: skip download, record `cache_hit=true` in session metadata.
+- Cache miss: download; if download fails, transition to `terminated` with `result=failure` and `failure_reason: model_download_failed`.
 
 **Dataset resolution**
 - `hf://<dataset_id>` or bare `<org>/<dataset>` → download via `datasets` library into local cache.
 - `local://<absolute_path>` → verify existence; mount read-only.
-- If any dataset fails to stage, transition to `failed` with `failure_reason: dataset_stage_failed`.
+- If any dataset fails to stage, transition to `terminated` with `result=failure` and `failure_reason: dataset_stage_failed`.
 
 **Environment**
 - `HF_HOME` is always set to a host directory bind-mounted into the container (e.g., `/cache/huggingface`).
-- The cache directory is shared across runs on the same node but namespaced by project if multi-tenant later.
+- The cache directory is shared across sessions on the same node but namespaced by project if multi-tenant later.
 
 ### 3.2 Idempotency Semantics
 
 If `idempotency_key` is provided:
 
-1. **Exact match**: If a run with the same key exists and the canonical finalized `spec.Spec` is identical, return the existing run immediately (HTTP 200 with existing `run_id`).
-2. **Conflict**: If a run with the same key exists but the canonical finalized `spec.Spec` differs, return HTTP 409 Conflict with the existing `run_id` so the agent can inspect the mismatch.
+1. **Exact match**: If a session with the same key exists and the canonical finalized `spec.Spec` is identical, return the existing session immediately (HTTP 200 with existing `session_id`).
+2. **Conflict**: If a session with the same key exists but the canonical finalized `spec.Spec` differs, return HTTP 409 Conflict with the existing `session_id` so the agent can inspect the mismatch.
 3. **No key**: Normal submission; no deduplication.
 
 This prevents an agent that retries after a network blip from accidentally spawning duplicate training jobs.
@@ -111,21 +111,19 @@ Canonical normalization must be deterministic across API, scheduler, and future 
 
 ## 4. State Machine
 
-MVP runs advance through the following states:
+MVP sessions advance through the following states:
 
-```
-queued → preparing → running → succeeded
-                    ↓
-                  failed
+```text
+pending → preparing → running → terminated
+                                  └─ result: success | failure
 ```
 
 | State | Meaning |
 |-------|---------|
-| `queued` | Accepted, waiting for GPU. |
+| `pending` | Accepted, waiting for GPU. |
 | `preparing` | Image pull, model download, dataset stage-in. |
 | `running` | Trainer process is active. |
-| `succeeded` | Trainer exited 0 and all outputs were captured. |
-| `failed` | Trainer exited non-zero or output capture failed. |
+| `terminated` | Execution finished; inspect `result` for success or failure. |
 
 **Preparing** is explicit so that `image_pull_failed` and `dataset_stage_failed` are distinguishable from training crashes.
 
@@ -133,108 +131,107 @@ queued → preparing → running → succeeded
 
 | From | To | Notes |
 |------|----|-------|
-| `queued` | `preparing` | Scheduler assigns a GPU and begins preparation. |
-| `preparing` | `running` | Image, assets, mounts, and workload preparation are ready. |
-| `preparing` | `failed` | Preparation failed; `failure_reason` is required. |
-| `running` | `succeeded` | Trainer exited 0 and required outputs were captured. |
-| `running` | `failed` | Trainer, timeout, OOM, or artifact capture failed; `failure_reason` is required. |
+| `pending` | `preparing` | Scheduler assigns a GPU and begins preparation. |
+| `preparing` | `running` | Image, assets, mounts, and kernel preparation are ready. |
+| `preparing` | `terminated` | Preparation failed; `result=failure` and `failure_reason` are required. |
+| `running` | `terminated` | Execution ends with `result=success` or `result=failure`. |
 
-`succeeded` and `failed` are terminal in the MVP. Phase 2 will add cancellation semantics and the `cancelled` terminal state.
+`terminated` is terminal in the MVP. Lifecycle status and execution result are intentionally separate.
 
 ### 4.0.2 Domain Transition API
 
 The Go domain model represents status changes with a `Transition` value:
 
 ```go
-r.Transition(run.Next(run.Preparing), now)
-r.Transition(run.Fail("trainer_error"), now)
+r.Transition(session.Next(session.Preparing), now)
+r.Transition(session.Fail("trainer_error"), now)
 ```
 
 `Next` is used for ordinary transitions. `Fail` is the only constructor that attaches a `FailureReason`, so callers cannot accidentally attach failure metadata to non-failed statuses.
 
-## 4.1 Workload Architecture
+## 4.1 Session and Kernel Architecture
 
-The platform treats Docker as an agent-side workload substrate, not as a user-facing abstraction. Manager-side scheduling code depends on a narrow workload contract. Docker SDK types and container-specific details stay inside the agent-side Docker workload backend.
+The platform treats Docker as an agent-side kernel substrate, not as a user-facing abstraction. Manager-side scheduling code depends on a narrow kernel contract. Docker SDK types and container-specific details stay inside the agent-side Docker kernel runtime.
 
 ### Components
 
 | Component | Responsibility | Knows Docker? |
 |-----------|----------------|---------------|
 | SpecBuilder | Finalize a submitted `draft.Draft` into an immutable `spec.Spec` for one submission mode. | No |
-| ScheduleCoordinator | Own run lifecycle transitions, call provisioning/launch ports, and reconcile terminal state. | No |
-| WorkloadProvisioner | Claim capacity, choose the agent/GPU/storage binding, and build a `WorkloadPlan`. | No |
-| WorkloadLauncher | Manager-side port for preparing, starting, and cleaning up a workload. | No |
-| HTTPWorkloadLauncher | First concrete manager-to-agent REST client adapter for `WorkloadLauncher`. | Transport only |
-| DockerWorkloadBackend | Agent-internal implementation that materializes the workload as a Docker container. | Yes |
+| ScheduleCoordinator | Own session lifecycle transitions, call provisioning/launch ports, and reconcile terminal state. | No |
+| SessionProvisioner | Claim capacity, choose the agent/GPU/storage binding, and build a `KernelCreationSpec`. | No |
+| KernelLauncher | Manager-side port for preparing, starting, and cleaning up a kernel. | No |
+| HTTPKernelLauncher | First concrete manager-to-agent REST client adapter for `KernelLauncher`. | Transport only |
+| DockerRuntime | Agent-internal implementation that materializes the kernel as a Docker container. | Yes |
 
 MVP does not need a general scheduler framework, handler DSL, or external hint store. A small `ScheduleCoordinator` plus repository state is sufficient for the single-node Phase 0 target.
 
-### WorkloadPlan
+### KernelCreationSpec
 
-`WorkloadPlan` is the fully bound workload request created after a queued run has been selected and capacity has been claimed. It contains the values the agent needs to prepare and start the trainer container:
+`KernelCreationSpec` is the fully bound kernel creation request created after a pending session has been selected and capacity has been claimed. It contains the values the agent needs to prepare and start the trainer container:
 
-- Run, project, and spec IDs
+- Session, project, and spec IDs
 - Trainer image ref, entrypoint/command, and environment
 - Assigned agent ID
 - Assigned agent-local GPU index (`0` or `1`)
 - Agent-visible workspace, cache, artifact, log, and config paths or refs
 - Timeout and output expectations needed for Phase 0 validation
 
-`WorkloadPlan` must not contain Docker SDK types, raw Docker container config, or manager-local filesystem assumptions. The agent-side backend may translate it into Docker-specific options only after the manager-agent boundary.
+`KernelCreationSpec` must not contain Docker SDK types, raw Docker container config, or manager-local filesystem assumptions. The agent-side backend may translate it into Docker-specific options only after the manager-agent boundary.
 
-### WorkloadLauncher Contract
+### KernelLauncher Contract
 
 The initial public port is intentionally small:
 
 ```go
-type WorkloadLauncher interface {
-    Prepare(ctx context.Context, plan WorkloadPlan) (WorkloadRef, error)
-    Start(ctx context.Context, ref WorkloadRef) error
-    Cleanup(ctx context.Context, ref WorkloadRef) error
+type KernelLauncher interface {
+    Prepare(ctx context.Context, plan KernelCreationSpec) (KernelID, error)
+    Start(ctx context.Context, ref KernelID) error
+    Cleanup(ctx context.Context, ref KernelID) error
 }
 ```
 
-`WorkloadRef` is an opaque reference to an agent-side prepared workload. It should carry enough identity to route later calls, such as run ID, agent ID, and an agent workload ID, without exposing a Docker container ID as a manager-domain concept.
+`KernelID` is an opaque reference to an agent-side prepared kernel. It should carry enough identity to route later calls, such as session ID, agent ID, and an kernel ID, without exposing a Docker container ID as a manager-domain concept.
 
 `Wait`, `Inspect`, `StreamLogs`, `Remove`, and explicit image-management methods are not part of this initial port. The launcher triggers and materializes work; the `ScheduleCoordinator` owns terminal observation, failure mapping, and finalization through a reconcile path.
 
 ### Manager-Agent Boundary
 
-The first concrete manager-agent adapter is REST/HTTP. The common workload contract remains transport-agnostic so another transport can be introduced later without changing scheduling code.
+The first concrete manager-agent adapter is REST/HTTP. The common kernel contract remains transport-agnostic so another transport can be introduced later without changing scheduling code.
 
-Initial agent workload endpoints:
+Initial kernel endpoints:
 
 | Method | Path | Meaning |
 |--------|------|---------|
-| POST | `/v1/workloads/prepare` | Materialize a `WorkloadPlan` into a prepared agent-side workload and return a `WorkloadRef`. |
-| POST | `/v1/workloads/{workload_ref}/start` | Start the prepared workload. |
-| POST | `/v1/workloads/{workload_ref}/cleanup` | Best-effort cleanup after terminal or preparation failure paths. |
-| GET | `/v1/workloads/{workload_ref}/status` | Return minimal observed status, exit code, OOM/timeout signals, and failure detail where available. |
+| POST | `/v1/kernels/prepare` | Materialize a `KernelCreationSpec` into a prepared agent-side kernel and return a `KernelID`. |
+| POST | `/v1/kernels/{kernel_id}/start` | Start the prepared kernel. |
+| POST | `/v1/kernels/{kernel_id}/cleanup` | Best-effort cleanup after terminal or preparation failure paths. |
+| GET | `/v1/kernels/{kernel_id}/status` | Return minimal observed status, exit code, OOM/timeout signals, and failure detail where available. |
 
-HTTP request/response DTOs belong at the transport boundary. They must not leak into `internal/common/workload`.
+HTTP request/response DTOs belong at the transport boundary. They must not leak into `internal/common/kernel`.
 
-### Docker Workload Scope
+### Docker Kernel Runtime Scope
 
-The Docker workload backend implements only the Phase 0 operations needed behind the agent API:
+The Docker kernel runtime implements only the Phase 0 operations needed behind the agent API:
 
 - Pull or verify the trainer image during preparation
-- Create the container from the bound `WorkloadPlan`
+- Create the container from the bound `KernelCreationSpec`
 - Start the container
 - Observe container exit, exit code, timeout, and OOM where detectable
 - Preserve stdout/stderr and partial artifacts
-- Remove or clean up the prepared workload on best effort
+- Remove or clean up the prepared kernel on best effort
 
 Everything else, including Docker networks, Docker volumes beyond bind mounts, multi-GPU-per-container training, Swarm/Kubernetes, registry auth hardening, and live log streaming, is out of scope for MVP.
 
 ### GPU Assignment
 
 - One container receives exactly one GPU index (`NVIDIA_VISIBLE_DEVICES=i` or `--gpus '"device=i"'`).
-- `WorkloadProvisioner` assigns the agent-local GPU index; `DockerWorkloadBackend` only materializes it.
+- `SessionProvisioner` assigns the agent-local GPU index; `DockerRuntime` only materializes it.
 - This makes GPU scheduling explicit and traceable.
 
 ### Failure Taxonomy Mapping (Preparing Phase)
 
-The `preparing` state maps to concrete workload preparation operations:
+The `preparing` state maps to concrete kernel preparation operations:
 
 | Operation | Failure Reason |
 |-----------|----------------|
@@ -249,12 +246,12 @@ This gives the agent a clear signal without parsing raw Docker stderr.
 ### Extension Path
 
 - **Phase 2**: Cancel (SIGTERM to SIGKILL timeout), OOM detection hardening, orphan cleanup.
-- **Phase 3**: Multi-node scheduling by binding `agent_id + agent endpoint + gpu_index` in `WorkloadPlan`.
+- **Phase 3**: Multi-node scheduling by binding `agent_id + agent endpoint + gpu_index` in `KernelCreationSpec`.
 - **Phase 4**: Cache and volume policy through a storage planner that binds concrete agent-visible paths before launch.
 
 ## 5. Failure Taxonomy
 
-Every failed run must record a non-empty machine-readable `failure_reason`.
+Every session with `result=failure` must record a non-empty machine-readable `failure_reason`.
 
 The Go domain type intentionally starts with only `type FailureReason string`. Concrete constants should be added only when the corresponding behavior is implemented. The planned MVP reasons are:
 
@@ -273,20 +270,20 @@ The Go domain type intentionally starts with only `type FailureReason string`. C
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/runs` | Submit a run draft. Returns `{run_id, status}`. |
-| GET | `/runs/{id}` | Full run record including spec and status. |
-| GET | `/runs/{id}/logs` | Tail logs with cursor pagination. |
-| GET | `/projects/{id}/runs` | List recent runs for a project. |
-| GET | `/artifacts/{run_id}/{path}` | Download an artifact file. |
+| POST | `/sessions` | Submit a session draft. Returns `{session_id, status}`. |
+| GET | `/sessions/{id}` | Full session record including spec and status. |
+| GET | `/sessions/{id}/logs` | Tail logs with cursor pagination. |
+| GET | `/projects/{id}/sessions` | List recent sessions for a project. |
+| GET | `/artifacts/{session_id}/{path}` | Download an artifact file. |
 
-`POST /runs/{id}/cancel` is deferred to Phase 2.
+`POST /sessions/{id}/cancel` is deferred to Phase 2.
 
 ### 6.1 Validation Architecture
 
 Validation happens in two layers:
 
 **API layer (preflight)**
-- Parse and normalize the incoming run draft.
+- Parse and normalize the incoming session draft.
 - Reject immediately with 4xx for:
   - Missing required fields
   - Unknown preset
@@ -296,10 +293,10 @@ Validation happens in two layers:
 - This gives the agent fast failure without consuming queue or GPU capacity.
 
 **Scheduler core (authoritative)**
-- Final validation before run creation:
+- Final validation before session creation:
   - Idempotency reservation and exact-match check (race-safe via DB unique constraint).
   - Resource availability check (GPU count, memory).
-- The core is the single source of truth for run creation rules.
+- The core is the single source of truth for session creation rules.
 - New entry points (CLI, batch submitter, future k8s controller) must route through the same core validator.
 
 **RunSpec finalization**
@@ -312,7 +309,7 @@ Validation happens in two layers:
 - The submit/API layer chooses the builder for the submission mode; raw/custom submission should use a separate builder instead of adding mode branches inside `specbuilder.PresetBacked`.
 
 **Idempotency in the core**
-- Same `idempotency_key` + same normalized spec → return existing run.
+- Same `idempotency_key` + same normalized spec → return existing session.
 - Same `idempotency_key` + different spec → 409 Conflict.
 - The DB enforces `UNIQUE(project_id, idempotency_key)` to protect against concurrent submission races.
 
@@ -321,7 +318,7 @@ Validation happens in two layers:
 No WebSocket. Cursor-based tail for simple agent polling and retries:
 
 ```
-GET /runs/{id}/logs?stream=stdout&cursor=1234&limit=200
+GET /sessions/{id}/logs?stream=stdout&cursor=1234&limit=200
 ```
 
 Response:
@@ -337,10 +334,10 @@ Response:
 
 ## 7. Artifact Contract
 
-Every successful (or failed) run must write the following to its artifact directory:
+Every successful (or failed) session must write the following to its artifact directory:
 
 ```
-/artifacts/{project_id}/{run_id}/
+/artifacts/{project_id}/{session_id}/
   spec.yaml              # original submitted spec
   resolved_config.yaml   # runtime-materialized view of spec.TrainingOptions, when the trainer requires YAML
   stdout.log
@@ -351,7 +348,7 @@ Every successful (or failed) run must write the following to its artifact direct
   merged/                # optionally merged full weights
 ```
 
-**Rule:** if `spec.yaml` and the finalized training options artifact are missing, the run is considered incomplete. The artifact may be named `resolved_config.yaml` for trainer compatibility, but YAML is not the source-of-truth representation inside the manager.
+**Rule:** if `spec.yaml` and the finalized training options artifact are missing, the session is considered incomplete. The artifact may be named `resolved_config.yaml` for trainer compatibility, but YAML is not the source-of-truth representation inside the manager.
 
 The platform tracks produced files with an `ArtifactIndex`: a base path plus file entries containing relative path, size, and checksum metadata. The filesystem remains the source of truth for file contents.
 
@@ -395,7 +392,7 @@ Every preset must produce a `metrics.json` with at minimum the following fields.
 | `outcome.status` | yes | `succeeded` or `failed`. |
 | `outcome.epochs_completed` | yes | How many epochs actually finished. |
 
-`eval` is optional but when present must follow the same shape. This lets agents compare runs that used eval against runs that did not without schema drift.
+`eval` is optional but when present must follow the same shape. This lets agents compare sessions that used eval against sessions that did not without schema drift.
 
 ## 8. TrainerPreset Contract
 
@@ -475,11 +472,11 @@ A preset is not just a Docker image. It is a **behavioral contract** between the
 6. `/workspace/output/adapter/` — if adapter output is requested by the resolved preset/output policy.
 7. `/workspace/output/merged/` — if merged model output is requested by the resolved preset/output policy.
 
-If any required output is missing, the run transitions to `failed` with `failure_reason: trainer_error` and the platform captures whatever partial outputs exist.
+If any required output is missing, the session transitions to `terminated` with `result=failure` and `failure_reason: trainer_error` and the platform captures whatever partial outputs exist.
 
 ## 9. Storage Driver
 
-MVP uses local filesystem only. The artifact store is behind a narrow driver interface so that `s3://` or `minio://` can be added later without changing Run logic.
+MVP uses local filesystem only. The artifact store is behind a narrow driver interface so that `s3://` or `minio://` can be added later without changing Session logic.
 
 ```go
 type StorageDriver interface {
@@ -491,7 +488,7 @@ type StorageDriver interface {
 
 ## 10. IDs
 
-Project, Spec, and Run IDs are UUIDs in the initial Go domain model:
+Project, Spec, and Session IDs are UUIDs in the initial Go domain model:
 
 ```
 4e78df8a-bdb7-41e8-92d7-a1a9f26fd90c
@@ -501,7 +498,7 @@ UUIDs are stable, widely supported, and already used in the codebase. If agent-f
 
 ## 11. Database (SQLite)
 
-MVP persists run state in SQLite.
+MVP persists session state in SQLite.
 
 Minimal schema:
 
@@ -571,7 +568,7 @@ CREATE TABLE spec_preset_refs (
     PRIMARY KEY(spec_id, category)
 );
 
-CREATE TABLE runs (
+CREATE TABLE sessions (
     id TEXT PRIMARY KEY,
     project_id TEXT NOT NULL REFERENCES projects(id),
     spec_id TEXT NOT NULL REFERENCES specs(id),
@@ -580,7 +577,7 @@ CREATE TABLE runs (
     artifact_path TEXT,
     assigned_agent_id TEXT,
     assigned_gpu_index INTEGER,
-    workload_ref TEXT,
+    kernel_id TEXT,
     idempotency_key TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     started_at DATETIME,
@@ -590,14 +587,14 @@ CREATE TABLE runs (
 );
 
 CREATE UNIQUE INDEX active_gpu_assignments
-ON runs(assigned_agent_id, assigned_gpu_index)
+ON sessions(assigned_agent_id, assigned_gpu_index)
 WHERE status IN ('preparing', 'running')
   AND assigned_agent_id IS NOT NULL
   AND assigned_gpu_index IS NOT NULL;
 
 CREATE TABLE artifacts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    run_id TEXT NOT NULL REFERENCES runs(id),
+    session_id TEXT NOT NULL REFERENCES sessions(id),
     path TEXT NOT NULL,
     type TEXT,
     size_bytes INTEGER,
@@ -612,13 +609,13 @@ JSON columns keep the schema stable during early iteration. Add typed columns on
 MVP scheduling is intentionally trivial because the hardware is fixed (single node, 2× RTX 3090).
 
 - **Policy**: FIFO per GPU. No preemption, no bin-packing, no priority queues.
-- **Concurrency**: One run per GPU. Maximum two runs may have an assigned GPU simultaneously.
+- **Concurrency**: One session per GPU. Maximum two sessions may have an assigned GPU simultaneously.
 - **GPU selection**: Assign the first free GPU (0 or 1). If both are free, prefer GPU 0.
-- **Resource claim**: `WorkloadProvisioner` records `assigned_agent_id` and `assigned_gpu_index` when moving a run from `queued` to `preparing`.
-- **Active capacity**: A run reserves exactly one GPU while it is in `preparing` or `running`. Terminal runs may keep assignment fields for audit, but they no longer count as active capacity.
-- **Workload reference**: `workload_ref` is recorded after `WorkloadLauncher.Prepare` succeeds so later `Start`, `Cleanup`, and observation calls can route to the same agent-side workload.
-- **Queue behavior**: If both GPUs are busy, new runs stay in `queued` until a GPU frees.
-- **Re-queue**: A `failed` run is never automatically retried. The agent must submit a new run.
+- **Resource claim**: `SessionProvisioner` records `assigned_agent_id` and `assigned_gpu_index` when moving a session from `pending` to `preparing`.
+- **Active capacity**: A session reserves exactly one GPU while it is in `preparing` or `running`. Terminal sessions may keep assignment fields for audit, but they no longer count as active capacity.
+- **Kernel reference**: `kernel_id` is recorded after `KernelLauncher.Prepare` succeeds so later `Start`, `Cleanup`, and observation calls can route to the same agent-side kernel.
+- **Queue behavior**: If both GPUs are busy, new sessions stay in `pending` until a GPU frees.
+- **Re-queue**: A session with `result=failure` is never automatically retried. The agent must submit a new session.
 - **Recovery**: The coordinator may use a periodic reconcile loop to recover missed wake-ups. MVP does not require Valkey/Redis or a distributed lock service.
 
 This avoids distributed-scheduler complexity while keeping behavior predictable and observable.
@@ -650,4 +647,4 @@ Both produce LoRA adapters. Merged model export is optional. They should be regi
 - A researcher agent should think in **hypotheses and variables**, not Docker flags.
 - TrainerPresets encode the trainer contract; resource/output presets can encode other categories; parameters encode the experiment.
 - Re-running a past experiment must be a single copy-paste of the draft or finalized spec.
-- A failed run must be inspectable without SSHing into the box.
+- A session with `result=failure` must be inspectable without SSHing into the box.

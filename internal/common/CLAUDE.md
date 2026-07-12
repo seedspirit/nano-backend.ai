@@ -10,7 +10,7 @@ This directory contains shared code that can be used across binaries and manager
 - `encoding/` — small shared encoding helpers.
 - `errordef/` — stable error codes and response-envelope mapping.
 - `kernel/` — runtime-facing kernel types and ports.
-- `workload/` — manager-agent workload contract types (Plan, Ref, value types).
+- `kernel/` — manager-agent kernel contract types (CreationSpec, ID, value types).
 
 ## Constraints
 

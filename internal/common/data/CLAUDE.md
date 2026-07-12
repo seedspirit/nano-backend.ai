@@ -18,4 +18,4 @@ This directory contains pure application data types.
 ## Directory Index
 
 - `project/` — project data.
-- `run/` — run lifecycle, draft input data, preset option data, and finalized spec data.
+- `session/` — session lifecycle, draft input data, preset option data, and finalized spec data.
