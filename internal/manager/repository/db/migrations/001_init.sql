@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS projects (
 CREATE TABLE IF NOT EXISTS specs (
     id TEXT PRIMARY KEY,
     project_id TEXT NOT NULL REFERENCES projects(id),
+    type TEXT NOT NULL DEFAULT 'batch',
     name TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '',
     -- TODO(normalize): split model_* into spec_model_options when more fields appear

@@ -44,7 +44,7 @@ func (r *SessionRepository) Close() error {
 func (r *SessionRepository) GetSpec(ctx context.Context, sessionID uuid.UUID) (spec.Spec, error) {
 	var row entity.Spec
 	err := r.db.GetContext(ctx, &row, `
-		SELECT specs.id, specs.project_id, specs.name, specs.description,
+		SELECT specs.id, specs.project_id, specs.type, specs.name, specs.description,
 			specs.model_base_model,
 			specs.resource_cpu_cores, specs.resource_gpu_count,
 			specs.resource_memory_limit_bytes, specs.resource_timeout_duration_seconds,
@@ -166,13 +166,13 @@ func (r *SessionRepository) CreateSession(ctx context.Context, sessionSpec *spec
 func insertSpec(ctx context.Context, tx *sqlx.Tx, e *entity.Spec) error {
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO specs (
-			id, project_id, name, description,
+			id, project_id, type, name, description,
 			model_base_model,
 			resource_cpu_cores, resource_gpu_count,
 			resource_memory_limit_bytes, resource_timeout_duration_seconds,
 			created_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, e.ID, e.ProjectID, e.Name, e.Description,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, e.ID, e.ProjectID, e.Type, e.Name, e.Description,
 		e.ModelBaseModel,
 		e.ResourceCPUCores, e.ResourceGPUCount,
 		e.ResourceMemoryLimitBytes, e.ResourceTimeoutDurationSeconds,

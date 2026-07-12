@@ -69,11 +69,11 @@ func TestMigrateIsIdempotent(t *testing.T) {
 	}
 }
 
-func TestGetSpecUsesRunID(t *testing.T) {
+func TestGetSpecUsesSessionID(t *testing.T) {
 	fixture := newSessionRepositoryFixture(t)
 	projectID := fixture.givenProject()
 	specID := fixture.givenSpec(projectID, "mergeowl-exp-42")
-	sessionID := fixture.givenRunForSpec(projectID, specID, testCreatedAt)
+	sessionID := fixture.givenSessionForSpec(projectID, specID, testCreatedAt)
 	trainerPresetID := sessionspecpreset.PresetAxolotlLoRASFT
 
 	fixture.givenTrainerPresetRef(specID, trainerPresetID)
@@ -84,6 +84,9 @@ func TestGetSpecUsesRunID(t *testing.T) {
 	}
 	if got.ID != specID {
 		t.Fatalf("got spec id %s, want %s", got.ID, specID)
+	}
+	if got.Type != session.Batch {
+		t.Fatalf("got session type %q, want %q", got.Type, session.Batch)
 	}
 	if got.PresetRefs.Trainer == nil || *got.PresetRefs.Trainer != trainerPresetID {
 		t.Fatalf("got trainer preset ref %v, want %s", got.PresetRefs.Trainer, trainerPresetID)
@@ -134,7 +137,7 @@ func TestGetSpecPreservesFloatTrainingParameter(t *testing.T) {
 	fixture := newSessionRepositoryFixture(t)
 	projectID := fixture.givenProject()
 	specID := fixture.givenSpec(projectID, "mergeowl-exp-float")
-	sessionID := fixture.givenRunForSpec(projectID, specID, testCreatedAt)
+	sessionID := fixture.givenSessionForSpec(projectID, specID, testCreatedAt)
 
 	if _, err := fixture.repo.db.ExecContext(fixture.ctx, `
 		INSERT INTO spec_training_parameters (spec_id, key, value)
@@ -193,12 +196,12 @@ func TestSpecChildRowsCascadeOnDelete(t *testing.T) {
 	}
 }
 
-func TestListProjectSessionsReturnsMostRecentRunsWithinLimit(t *testing.T) {
+func TestListProjectSessionsReturnsMostRecentSessionsWithinLimit(t *testing.T) {
 	fixture := newSessionRepositoryFixture(t)
 	projectID := fixture.givenProject()
-	fixture.givenRun(projectID, "old", "2026-05-21T00:00:00Z")
-	middleSessionID := fixture.givenRun(projectID, "middle", "2026-05-21T00:01:00Z")
-	newSessionID := fixture.givenRun(projectID, "new", "2026-05-21T00:02:00Z")
+	fixture.givenSession(projectID, "old", "2026-05-21T00:00:00Z")
+	middleSessionID := fixture.givenSession(projectID, "middle", "2026-05-21T00:01:00Z")
+	newSessionID := fixture.givenSession(projectID, "new", "2026-05-21T00:02:00Z")
 
 	got, err := fixture.repo.ListProjectSessions(fixture.ctx, projectID, 2)
 	if err != nil {
@@ -218,7 +221,7 @@ func TestListProjectSessionsReturnsMostRecentRunsWithinLimit(t *testing.T) {
 	}
 }
 
-func TestListProjectSessionsReturnsEmptyForProjectWithoutRuns(t *testing.T) {
+func TestListProjectSessionsReturnsEmptyForProjectWithoutSessions(t *testing.T) {
 	fixture := newSessionRepositoryFixture(t)
 	projectID := fixture.givenProject()
 
@@ -322,13 +325,13 @@ func (f *sessionRepositoryFixture) givenSpec(projectID uuid.UUID, name string) u
 	return id
 }
 
-func (f *sessionRepositoryFixture) givenRun(projectID uuid.UUID, name, createdAt string) uuid.UUID {
+func (f *sessionRepositoryFixture) givenSession(projectID uuid.UUID, name, createdAt string) uuid.UUID {
 	f.t.Helper()
 	specID := f.givenSpec(projectID, name)
-	return f.givenRunForSpec(projectID, specID, createdAt)
+	return f.givenSessionForSpec(projectID, specID, createdAt)
 }
 
-func (f *sessionRepositoryFixture) givenRunForSpec(projectID, specID uuid.UUID, createdAt string) uuid.UUID {
+func (f *sessionRepositoryFixture) givenSessionForSpec(projectID, specID uuid.UUID, createdAt string) uuid.UUID {
 	f.t.Helper()
 	id := uuid.New()
 	if _, err := f.repo.db.ExecContext(f.ctx, `
@@ -350,7 +353,7 @@ func (f *sessionRepositoryFixture) givenTrainerPresetRef(specID, presetID uuid.U
 	}
 }
 
-func TestCreateSessionPersistsSpecAndRun(t *testing.T) {
+func TestCreateSessionPersistsSpecAndSession(t *testing.T) {
 	fixture := newSessionRepositoryFixture(t)
 	projectID := fixture.givenProject()
 	specValue := sampleSpec(projectID)

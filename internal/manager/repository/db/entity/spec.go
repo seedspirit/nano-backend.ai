@@ -16,6 +16,7 @@ import (
 type Spec struct {
 	ID                             string `db:"id"`
 	ProjectID                      string `db:"project_id"`
+	Type                           string `db:"type"`
 	Name                           string `db:"name"`
 	Description                    string `db:"description"`
 	ModelBaseModel                 string `db:"model_base_model"`
@@ -74,6 +75,7 @@ func (s *Spec) ToData() (spec.Spec, error) {
 	return spec.Spec{
 		ID:          id,
 		ProjectID:   projectID,
+		Type:        session.Type(s.Type),
 		Name:        s.Name,
 		Description: s.Description,
 		PresetRefs:  s.PresetRefs,
@@ -125,9 +127,15 @@ func FromData(source *spec.Spec, createdAt string) (Spec, error) {
 		})
 	}
 
+	sessionType := source.Type
+	if sessionType == "" {
+		sessionType = session.Batch
+	}
+
 	return Spec{
 		ID:                             source.ID.String(),
 		ProjectID:                      source.ProjectID.String(),
+		Type:                           string(sessionType),
 		Name:                           source.Name,
 		Description:                    source.Description,
 		ModelBaseModel:                 source.ModelOptions.BaseModel,
