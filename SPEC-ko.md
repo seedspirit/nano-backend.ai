@@ -1,662 +1,314 @@
-# nano-backend.ai MVP 명세
+# nano-backend.ai 제품 및 아키텍처 방향
 
-> 상태: 초안  
-> 범위: MergeOwl Phase 0 — 단일 노드 GPU를 위한 agent-native 파인튜닝 ledger
+> 상태: Draft
+> 현재 범위: Phase 0 — 단일 노드 GPU 기반의 agent-native 모델 개발 기반
 
-## 1. 목적
+## 1. 비전
 
-nano-backend.ai MVP는 범용 job runner가 아니다. 이 시스템은 ML 연구자 에이전트가 최소한의 인프라 표면만으로 학습 실행을 제출하고, 추적하고, 재현할 수 있게 해 주는 **preset-validated fine-tuning ledger**다.
+nano-backend.ai의 최종 목표는 단순한 파인튜닝 실행기가 아니다. AI agent가
+모델 개발 목표를 받아 코드를 작성하고, notebook에서 탐색하고, 학습과 평가를
+반복하고, 결과물을 비교해 다음 행동을 결정할 수 있는 작은 Backend.AI를 만드는
+것이 목표다.
 
-하드 제약 조건:
-- 단일 노드, 2× RTX 3090
-- 단일 GPU 작업만 허용(분산 학습 없음)
-- preset ref + option parameter를 통한 선언적 제출
-- 모든 session은 완전하고 검증 가능한 artifact set을 남겨야 함
+사용자는 Docker 명령이나 GPU 번호가 아니라 다음과 같은 의도를 표현해야 한다.
 
-## 2. 핵심 객체
+- 개발 환경을 열고 데이터와 모델을 탐색한다.
+- 코드를 제출해 유한한 작업을 실행한다.
+- 학습과 평가를 반복하며 가장 좋은 결과를 찾는다.
+- 완성된 모델을 추론 환경으로 연다.
+- 이전 실행의 입력과 결과를 바탕으로 실험을 재현한다.
 
-| 객체 | 설명 |
-|--------|-------------|
-| **Project** | 서로 관련된 session들을 묶는 namespace (예: `mergeowl`) |
-| **AgentTask** | AI agent에게 위임한 장기 목표를 나타내는 future orchestration boundary |
-| **Experiment** | 관련 개발 시도, 비교, artifact를 묶는 future grouping |
-| **Session** | immutable session Spec으로 정의되는 user-visible compute lifecycle |
-| **Kernel** | Agent가 Session을 위해 생성하는 isolated compute unit |
-| **TrainerPreset** | 검증된 trainer contract(stable ID, runtime, 기본값, option policy 포함) |
-| **ArtifactIndex** | session이 생성한 파일을 플랫폼이 추적하기 위한 색인 |
-| **Asset** | 모델 또는 데이터셋에 대한 외부 참조(HF Hub URI, 로컬 경로) |
+플랫폼은 이 의도를 검증 가능한 실행 명세로 바꾸고, 자원을 할당하고, 실행
+과정과 결과를 영속적으로 기록한다.
 
-## 3. SessionSpecDraft and Spec
+## 2. 현재 단계와 장기 방향
 
-Session은 `draft.Draft`를 제출해서 생성한다. 플랫폼은 선택된 preset ref를 읽고, `Draft + Presets`로 구성된 `sessionspec.Candidate`를 검증한 뒤, 구조화된 `spec.TrainingOptions`를 포함하는 immutable `spec.Spec`을 만든다.
+장기 비전은 넓지만 Phase 0은 의도적으로 작게 시작한다.
 
-```yaml
-project_id: 4e78df8a-bdb7-41e8-92d7-a1a9f26fd90c
-type: batch
-name: mergeowl-exp-42
-description: MergeOwl v1용 LoRA SFT 실험
-preset_refs:
-  trainer: 16f6f42a-597b-4c37-9b8e-7f3908fbfa73
-model_options:
-  base_model: unsloth/Llama-3.1-8B
-data_options:
-  datasets:
-    - path: mergeowl/v1
-      split: train
-resource_options:
-  gpu:
-    count: 1
-  memory:
-    limit_bytes: 34359738368
-  timeout:
-    duration_seconds: 14400
-training_options:
-  parameters:
-    learning_rate: 2.0e-4
-    num_epochs: 3
-    lora_r: 32
-    max_seq_length: 4096
-idempotency_key: mergeowl-exp-42   # optional, prevents duplicate submissions
+- 단일 머신, RTX 3090 GPU 2개
+- session 하나당 GPU 1개
+- preset으로 검증된 LoRA/SFT batch session
+- SQLite 기반의 session ledger
+- 로컬 파일시스템 기반 artifact 보존
+- 최대 2개 session 동시 실행
+
+Phase 0의 파인튜닝은 최종 제품 범위를 제한하는 것이 아니라, session 생성부터
+artifact 보존까지 전체 경로를 검증하기 위한 첫 vertical slice다.
+
+## 3. 도메인 모델
+
+```text
+Project
+  └─ AgentTask
+      └─ Experiment
+          └─ Session
+              └─ Kernel
 ```
 
-### 필드
+### Project
 
-| 필드 | 필수 | 설명 |
-|-------|----------|-------------|
-| `project_id` | yes | 대상 project UUID. 사람이 읽기 쉬운 조회는 CLI/search에서 제공할 수 있다. |
-| `type` | yes | Session 실행 모드: `interactive`, `batch`, `inference`, `system`. Phase 0 제출은 `batch`를 사용한다. |
-| `name` | yes | 사람이 읽을 수 있는 spec 이름 |
-| `description` | no | 사람이 읽을 수 있는 설명 |
-| `preset_refs.trainer` | no | optional stable trainer preset UUID. Phase 0 preset-backed spec builder를 사용할 때는 필수 |
-| `preset_refs.resource` | no | 향후 resource default/policy bundle을 위한 optional resource preset ID |
-| `preset_refs.output` | no | 향후 artifact/output policy bundle을 위한 optional output preset ID |
-| `model_options.base_model` | yes | HF Hub model ID 또는 로컬 asset URI |
-| `data_options.datasets` | yes | dataset reference 목록 |
-| `resource_options` | yes | 요청한 `cpu`, `gpu`, `memory`, `timeout` 값 |
-| `training_options.parameters` | no | 사용자가 제공한 training parameter. Preset-backed 제출에서는 선택된 trainer preset의 `OptionPolicy` 기준으로 검증된다 |
-| `idempotency_key` | no | 클라이언트가 제공하는 키. 중복이면 기존 session 반환 |
+관련 session, experiment, artifact와 asset을 묶는 namespace다. 장기적으로
+사람과 agent가 동일한 모델 개발 문맥을 공유하는 경계가 된다.
 
-`outputs`와 `lineage`는 예정된 확장 그룹이다. Artifact policy와 traceability 요구사항이 충분히 구체화된 뒤 public field를 삭제하지 않아도 되는 시점에 추가한다.
+### AgentTask
 
-### 3.1 Dataset / Model Staging Contract
+AI agent에게 위임한 장기 목표다. 예를 들어 “이 데이터셋으로 baseline보다 좋은
+adapter를 개발하라”와 같은 요청을 나타낸다. 하나의 AgentTask는 여러
+Experiment와 Session을 만들 수 있다.
 
-session이 `running` 상태에 들어가기 전에, 플랫폼은 `preparing` 단계에서 모든 asset을 resolve해야 한다.
+AgentTask는 구체적인 lifecycle과 완료 조건이 정해질 때 도입한다. Phase 0에서는
+용어와 책임 경계만 예약한다.
 
-**Base model resolution**
-- `hf://<model_id>` 또는 bare `<org>/<model>` → `huggingface_hub`를 통해 `HF_HOME` 캐시로 다운로드
-- `local://<absolute_path>` → 존재 여부를 검증하고 container에 read-only로 mount
-- Cache hit: 다운로드를 건너뛰고 session metadata에 `cache_hit=true` 기록
-- Cache miss: 다운로드 수행. 다운로드 실패 시 `terminated`, `result=failure`, `failure_reason: model_download_failed`로 기록
+### Experiment
 
-**Dataset resolution**
-- `hf://<dataset_id>` 또는 bare `<org>/<dataset>` → `datasets` 라이브러리를 통해 로컬 캐시로 다운로드
-- `local://<absolute_path>` → 존재 여부를 검증하고 read-only로 mount
-- 어떤 dataset이든 stage 실패 시 `terminated`, `result=failure`, `failure_reason: dataset_stage_failed`로 기록
+하나의 가설이나 비교 목적 아래 여러 개발 시도와 결과를 묶는다. 학습 session,
+평가 session, metric, report, model artifact의 관계를 표현한다.
 
-**Environment**
-- `HF_HOME`은 항상 host 디렉터리를 container에 bind mount한 경로로 설정한다(예: `/cache/huggingface`)
-- 캐시 디렉터리는 같은 노드의 session들이 공유하지만, 추후 multi-tenant가 도입되면 project 단위 namespace를 적용한다
+Experiment 역시 Phase 0의 영속 객체는 아니다. Session에 실험 orchestration
+책임을 넣지 않기 위한 상위 경계로 정의한다.
 
-### 3.2 Idempotency Semantics
+### Session
 
-`idempotency_key`가 제공된 경우:
+사용자가 생성하고 관찰하는 compute lifecycle이다. 무엇을 실행할지, 어떤 자원이
+필요한지, 어떤 asset과 mount를 사용할지를 immutable SessionSpec으로 표현한다.
 
-1. **Exact match**: 동일한 키의 session이 이미 존재하고 canonical finalized `spec.Spec`이 동일하면, 기존 session을 즉시 반환한다(HTTP 200, 기존 `session_id` 포함).
-2. **Conflict**: 동일한 키의 session이 존재하지만 canonical finalized `spec.Spec`이 다르면, 에이전트가 불일치를 확인할 수 있도록 기존 `session_id`와 함께 HTTP 409 Conflict를 반환한다.
-3. **No key**: 일반 제출로 처리하며 deduplication은 수행하지 않는다.
+Session type은 Backend.AI 용어를 따른다.
 
-이 규칙은 네트워크 일시 장애 후 재시도하는 에이전트가 중복 학습 작업을 실수로 생성하는 일을 막는다.
+- `interactive`: Jupyter, shell, IDE 같은 개발 환경
+- `batch`: 학습, 평가, 전처리, 제출 코드처럼 끝이 있는 실행
+- `inference`: 모델 serving 환경
+- `system`: 플랫폼 내부 작업
 
-Canonical normalization은 API, scheduler, future entry point 어디에서나 결정적이어야 한다:
+Phase 0의 파인튜닝은 `batch` session이다.
 
-- finalized spec 비교 전에 preset 기본값을 적용한다.
-- 플랫폼이 동등하다고 정의한 asset reference를 정규화한다. 예: bare HF ID와 `hf://` reference.
-- map은 안정적인 key order로 직렬화한다.
-- canonical finalized data 바깥의 request byte는 비교에 포함하지 않는다.
+### Kernel
 
-## 4. 상태 머신
+Agent가 실제로 생성하는 isolated compute unit이다. 일반적인 구현은 Docker
+container지만 process, VM, Kubernetes Pod로도 구현할 수 있다.
 
-MVP session은 다음 상태를 따라 진행된다:
+Manager는 Session을 관리하고 Agent는 Kernel을 materialize한다. Docker는 Kernel의
+한 구현일 뿐 public domain contract가 아니다.
+
+## 4. 핵심 설계 원칙
+
+### Agent-native interface
+
+API는 사람이 읽기 좋은 문장보다 agent가 안정적으로 분기할 수 있는 구조를 먼저
+제공한다.
+
+- stable error code
+- 명시적인 status와 result
+- poll 가능한 long-running resource
+- 재시도와 복구를 위한 next-action context
+- 결정적인 spec normalization
+
+### 선언적 입력
+
+사용자는 container 생성 방법을 직접 서술하지 않는다. SessionSpecDraft와 preset,
+option parameter로 의도를 제출한다. 플랫폼이 이를 검증하고 immutable
+SessionSpec으로 확정한다.
+
+### 재현성 우선
+
+모든 terminal session은 성공 여부와 관계없이 입력, resolved configuration, log,
+metric, report와 partial output을 보존해야 한다. 실패 역시 재현과 다음 판단에
+필요한 결과다.
+
+### infrastructure detail 격리
+
+Scheduler와 service는 Docker SDK나 HTTP DTO를 알지 않는다. Manager와 Agent가
+공유하는 Kernel contract는 transport와 runtime에 독립적이어야 한다.
+
+### lifecycle과 outcome 분리
+
+Session status는 현재 lifecycle 위치를, result는 종료 결과를 표현한다.
 
 ```text
 pending → preparing → running → terminated
-                                  └─ result: success | failure
+                                  └─ success | failure
 ```
 
-| 상태 | 의미 |
-|-------|---------|
-| `pending` | 접수되었고 GPU를 기다리는 상태 |
-| `preparing` | image pull, model download, dataset stage-in 수행 중 |
-| `running` | trainer 프로세스가 실행 중 |
-| `terminated` | 실행이 종료된 상태. 성공 여부는 `result`로 구분한다. |
+실패한 session도 status는 `terminated`이며 result가 `failure`다. 구체 원인은
+`failure_reason`으로 기록한다.
 
-**Preparing** 상태를 명시적으로 두는 이유는 `image_pull_failed`, `dataset_stage_failed`를 학습 중 crash와 구분하기 위해서다.
+### 작은 시작, 확장 가능한 경계
 
-### 4.0.1 허용 상태 전이
+Phase 0을 위해 범용 scheduler framework나 workflow engine을 만들지 않는다. 대신
+Session, Kernel, Runtime, Artifact 경계를 명확하게 유지해 이후 기능이 기존
+도메인 의미를 바꾸지 않고 확장되게 한다.
 
-| From | To | Notes |
-|------|----|-------|
-| `pending` | `preparing` | scheduler가 GPU를 할당하고 준비를 시작한다. |
-| `preparing` | `running` | image, asset, mount, kernel preparation이 준비되었다. |
-| `preparing` | `terminated` | 준비 단계 실패. `result=failure`와 `failure_reason`이 필요하다. |
-| `running` | `terminated` | 실행 결과에 따라 `result=success` 또는 `result=failure`를 기록한다. |
+## 5. Spec과 Preset의 역할
 
-MVP에서는 `terminated`가 terminal state다. Lifecycle status와 execution result는 분리한다.
+### SessionSpecDraft
 
-### 4.0.2 Domain Transition API
+사용자 또는 agent가 제출한 아직 확정되지 않은 의도다. 일부 값은 생략될 수 있고
+preset default가 적용되기 전일 수 있다.
 
-Go 도메인 모델은 상태 변경을 `Transition` 값으로 표현한다:
+### SessionSpec
 
-```go
-s.Transition(session.Next(session.Preparing), now)
-s.Transition(session.Fail("trainer_error"), now)
+검증과 default 적용을 마친 immutable 실행 정의다. 동일한 SessionSpec은 재현을
+위해 다시 사용할 수 있어야 한다.
+
+### Preset
+
+Preset은 단순한 설정 묶음이 아니라 플랫폼과 runtime 사이의 검증된 behavioral
+contract다. 어떤 입력을 허용하고, 어떤 default를 적용하며, 어떤 artifact를
+생성해야 하는지를 정의한다.
+
+Phase 0에서는 TrainerPreset이 중심이지만 장기적으로 resource policy와 output
+policy를 독립적으로 조합할 수 있어야 한다.
+
+Fine-tuning, notebook, evaluation, serving은 서로 다른 최상위 실행 객체가 아니다.
+각 목적에 맞는 입력이 SessionSpec으로 resolve되는 구조를 지향한다.
+
+## 6. Session에서 Kernel까지
+
+```text
+SessionSpecDraft
+  → validation / preset resolution
+  → immutable SessionSpec
+  → Session persistence
+  → scheduling and resource allocation
+  → kernel.CreationSpec
+  → Agent runtime
+  → Kernel
+  → observation and artifact reconciliation
 ```
 
-`Next`는 일반 전이에 사용한다. `Fail`만 `FailureReason`을 붙일 수 있으므로, 호출자가 failed가 아닌 상태에 failure metadata를 실수로 붙이는 조합을 만들 수 없다.
+- Manager는 session lifecycle과 scheduling 결정을 소유한다.
+- Provisioner는 실행할 Agent와 GPU device를 선택한다.
+- `kernel.CreationSpec`은 배치 결정까지 반영된 manager-agent contract다.
+- Agent runtime은 이를 Docker container 또는 다른 substrate로 변환한다.
+- 종료 관찰과 session result 확정은 Manager의 reconciliation 흐름으로 돌아온다.
 
-## 4.1 Session and Kernel Architecture
+Phase 0의 scheduling은 FIFO와 명시적 GPU allocation이면 충분하다. 공정성,
+priority, multi-node placement는 실제 요구가 생긴 이후 추가한다.
 
-플랫폼은 Docker를 사용자에게 직접 노출되는 추상화가 아니라 agent-side kernel substrate로 취급한다. Manager-side scheduling code는 좁은 kernel contract에만 의존한다. Docker SDK 타입과 container-specific 세부사항은 agent-side Docker kernel runtime 내부에 머물러야 한다.
+## 7. Artifact와 재현성
 
-### Components
+Artifact는 부가 기능이 아니라 session ledger의 핵심 결과다.
 
-| Component | Responsibility | Docker를 아는가? |
-|-----------|----------------|----------------|
-| SpecBuilder | 제출된 `draft.Draft` 하나를 immutable `spec.Spec`으로 finalize한다. | No |
-| SchedulerCoordinator | session lifecycle transition을 소유하고 provisioning/launch port를 호출하며 terminal state를 reconcile한다. | No |
-| SessionProvisioner | capacity를 claim하고 agent/GPU/storage binding을 선택한 뒤 `kernel.CreationSpec`을 만든다. | No |
-| KernelLauncher | kernel prepare/start/cleanup을 위한 manager-side port다. | No |
-| HTTPKernelLauncher | `KernelLauncher`의 첫 manager-to-agent REST client adapter다. | Transport only |
-| DockerRuntime | kernel를 Docker container로 materialize하는 agent-internal 구현이다. | Yes |
+최소한 다음 범주의 정보를 보존한다.
 
-MVP에는 일반화된 scheduler framework, handler DSL, 외부 hint store가 필요하지 않다. 단일 노드 Phase 0 target에서는 작은 `SchedulerCoordinator`와 repository state만으로 충분하다.
+- 제출된 spec과 finalized spec
+- runtime이 사용한 resolved configuration
+- stdout과 stderr
+- 구조화된 metric
+- 사람이 읽을 수 있는 report
+- 성공 결과 또는 partial output
+- 실행 환경과 resource allocation 정보
 
-### kernel.CreationSpec
+ArtifactIndex는 파일 위치, 크기, checksum과 같은 metadata를 제공한다. 저장소
+구현은 Phase 0에서 로컬 파일시스템이지만, session domain이 특정 storage backend에
+의존해서는 안 된다.
 
-`kernel.CreationSpec`은 pending session이 선택되고 capacity가 claim된 뒤 만들어지는 fully bound kernel creation request다. Agent가 trainer container를 prepare/start하기 위해 필요한 값을 담는다:
+## 8. API 방향
 
-- Session, project, spec ID
-- Trainer image ref, entrypoint/command, environment
-- 할당된 agent ID
-- 할당된 agent-local GPU index (`0` 또는 `1`)
-- Agent-visible workspace, cache, artifact, log, config path 또는 ref
-- Phase 0 validation에 필요한 timeout과 output expectation
+사용자-facing API의 중심 resource는 Session이다.
 
-`kernel.CreationSpec`에는 Docker SDK 타입, raw Docker container config, manager-local filesystem 가정이 들어가면 안 된다. Agent-side backend는 manager-agent boundary를 지난 뒤에만 이를 Docker-specific option으로 변환할 수 있다.
+- session spec draft 제출
+- session과 finalized spec 조회
+- project별 session 탐색
+- log와 artifact polling
+- 장기적으로 terminate/cancel 요청
 
-### KernelLauncher Contract
+Manager-Agent API의 중심 resource는 Kernel이다.
 
-초기 public port는 의도적으로 작게 둔다:
+- kernel prepare/create
+- kernel start
+- kernel status observation
+- kernel cleanup/destroy
 
-```go
-type KernelLauncher interface {
-    Prepare(ctx context.Context, spec kernel.CreationSpec) (kernel.ID, error)
-    Start(ctx context.Context, id kernel.ID) error
-    Cleanup(ctx context.Context, id kernel.ID) error
-}
-```
+외부 API와 내부 Agent API는 동일한 DTO를 공유하지 않는다. Domain type은
+transport-independent하게 유지한다.
 
-`kernel.ID`는 agent-side prepared kernel를 참조한다. 이후 호출 routing에
-필요한 session ID, agent ID, agent-assigned kernel ID를 담되 Docker container
-ID를 manager-domain concept로 노출하지 않는다.
+## 9. 오류와 복구 방향
 
-`Wait`, `Inspect`, `StreamLogs`, `Remove`, 명시적 image-management method는 초기 port에 포함하지 않는다. Launcher는 work를 trigger/materialize하고, `SchedulerCoordinator`가 reconcile path를 통해 terminal observation, failure mapping, finalization을 소유한다.
+오류는 raw runtime message가 아니라 stable failure taxonomy로 노출한다.
 
-### Manager-Agent Boundary
+예시:
 
-첫 manager-agent adapter는 REST/HTTP로 구현한다. Common kernel contract는 transport-agnostic하게 유지하여, 이후 다른 transport가 필요해져도 scheduling code를 바꾸지 않게 한다.
+- image pull failure
+- model 또는 dataset staging failure
+- resource exhaustion / OOM
+- timeout
+- trainer failure
+- artifact reconciliation failure
 
-초기 kernel endpoint:
+모든 failure는 log와 partial artifact를 최대한 보존해야 한다. Agent는
+`failure_reason`과 session context를 사용해 재시도, spec 수정, 사용자 보고 중
+다음 행동을 선택할 수 있어야 한다.
 
-| Method | Path | Meaning |
-|--------|------|---------|
-| POST | `/v1/kernels/prepare` | `kernel.CreationSpec`을 prepared agent-side kernel로 materialize하고 `KernelID`를 반환한다. |
-| POST | `/v1/kernels/{kernel_id}/start` | 준비된 kernel를 시작한다. |
-| POST | `/v1/kernels/{kernel_id}/cleanup` | terminal 또는 preparation failure path 이후 best-effort cleanup을 수행한다. |
-| GET | `/v1/kernels/{kernel_id}/status` | 최소 observed status, exit code, OOM/timeout signal, 가능한 failure detail을 반환한다. |
+Idempotency는 네트워크 재시도가 중복 session을 생성하지 않게 한다. 동일한 key와
+동일한 normalized spec은 기존 session을 반환하고, 다른 spec은 conflict로
+처리한다.
 
-HTTP request/response DTO는 transport boundary에만 둔다. `internal/common/kernel`로 새어 들어가면 안 된다.
+## 10. 단계별 확장
 
-### Docker Kernel Runtime Scope
+### Phase 0 — Fine-tuning vertical slice
 
-Docker kernel runtime는 agent API 뒤에서 Phase 0에 필요한 동작만 구현한다:
+- preset-backed batch session
+- 단일 노드 GPU allocation
+- session ledger와 기본 조회 API
+- Kernel contract와 Docker runtime 방향 확정
+- log, metric, model artifact 보존
 
-- Preparation 단계에서 trainer image를 pull 또는 verify
-- Bound `kernel.CreationSpec`으로 container 생성
-- Container 시작
-- Container exit, exit code, timeout, OOM을 가능한 범위에서 관측
-- stdout/stderr와 partial artifact 보존
-- Prepared kernel를 best-effort로 remove 또는 cleanup
+### Phase 1 — 실행 경로 완성
 
-그 외 Docker network, bind mount 외 Docker volume, container당 multi-GPU training, Swarm/Kubernetes, registry auth hardening, live log streaming은 MVP 범위 밖이다.
+- Manager-Agent Kernel API
+- Docker runtime materialization
+- asset staging과 cache
+- terminal observation과 reconciliation
+- 실패 taxonomy의 실제 runtime mapping
 
-### GPU Assignment
+### Phase 2 — 개발 환경과 제어
 
-- 하나의 container는 정확히 하나의 GPU index만 받는다 (`NVIDIA_VISIBLE_DEVICES=i` 또는 `--gpus '"device=i"'`)
-- `SessionProvisioner`가 agent-local GPU index를 할당하고, `DockerRuntime`는 그것을 materialize만 한다
-- 이를 통해 GPU 스케줄링이 명시적이고 추적 가능해진다
+- interactive notebook/shell session
+- submitted-code batch session
+- cancel/terminate와 timeout
+- orphan kernel cleanup
+- richer log and artifact APIs
 
-### Failure Taxonomy Mapping (Preparing Phase)
+### Phase 3 — Agent-driven model development
 
-`preparing` 상태는 다음과 같은 kernel preparation operation에 대응된다:
-
-| Operation | Failure Reason |
-|-----------|----------------|
-| Image pull | `image_pull_failed` |
-| Container create | `container_create_failed` |
-| Model download | `model_download_failed` |
-| Dataset stage | `dataset_stage_failed` |
-| (other) | `unknown` |
-
-이렇게 하면 에이전트는 raw Docker stderr를 파싱하지 않아도 명확한 신호를 얻을 수 있다.
-
-### Extension Path
-
-- **Phase 2**: Cancel(SIGTERM to SIGKILL timeout), OOM detection hardening, orphan cleanup.
-- **Phase 3**: `kernel.CreationSpec`에 `agent_id + agent endpoint + gpu_index`를 binding하는 multi-node scheduling.
-- **Phase 4**: Launch 전에 concrete agent-visible path를 binding하는 storage planner 기반 cache/volume policy.
-
-## 5. Failure Taxonomy
-
-실패한 모든 session은 비어 있지 않은 machine-readable `failure_reason`을 기록해야 한다.
-
-Go 도메인 타입은 의도적으로 `type FailureReason string`만 먼저 둔다. 구체 상수는 해당 동작이 실제로 구현될 때 추가한다. 계획 중인 MVP reason은 다음과 같다:
-
-- `image_pull_failed`
-- `container_create_failed`
-- `dataset_stage_failed`
-- `model_download_failed`
-- `oom`
-- `trainer_error`
-- `timeout`
-- `unknown`
-
-`cancelled`는 Phase 2를 위해 예약되어 있으며 MVP에서는 기록하지 않는다.
-
-## 6. API (Minimal Set)
-
-| Method | Path | 설명 |
-|--------|------|-------------|
-| POST | `/v1/sessions` | session spec draft 제출. 생성된 session summary 반환 |
-| GET | `/v1/sessions/{id}/spec` | session과 연결된 finalized spec 조회 |
-| GET | `/v1/sessions/{id}/logs` | 예정: cursor pagination 기반 tail logs 조회 |
-| GET | `/v1/projects/{id}/sessions` | project의 최근 session 목록 조회 |
-| GET | `/v1/artifacts/{session_id}/{path}` | 예정: artifact 파일 다운로드 |
-
-`POST /v1/sessions/{id}/cancel`은 Phase 2로 연기한다.
-
-### 6.1 Validation Architecture
-
-검증은 두 레이어에서 수행된다:
-
-**API layer (preflight)**
-- 들어온 session draft를 파싱하고 정규화한다
-- 다음 경우 즉시 4xx로 거부한다:
-  - 필수 필드 누락
-  - 존재하지 않는 preset
-  - preset `OptionPolicy` 밖의 parameter key
-  - policy type 또는 numeric range를 만족하지 않는 parameter value
-  - 형식이 잘못된 asset URI
-- 이렇게 하면 queue나 GPU 용량을 소모하지 않고 에이전트에게 빠른 실패를 제공할 수 있다
-
-**Scheduler core (authoritative)**
-- session 생성 직전에 최종 검증을 수행한다:
-  - idempotency 예약 및 exact-match 검사(DB unique constraint로 race-safe 보장)
-  - 자원 가용성 검사(GPU 개수, 메모리)
-- core는 session 생성 규칙의 single source of truth다
-- 새로운 진입점(CLI, batch submitter, 향후 k8s controller)도 반드시 동일한 core validator를 거쳐야 한다
-
-**SessionSpec finalization**
-- `specbuilder.Builder`는 제출된 `draft.Draft` 하나를 immutable `spec.Spec`으로 finalize하는 공통 interface다.
-- `specbuilder.PresetBacked`는 preset-backed spec building을 구현하며 preset lookup, validation, finalization을 orchestration한다.
-- `specbuilder.PresetBacked`는 concrete 구현체가 아니라 `PresetRegistry`와 `specbuilder.Validator` interface에 의존한다.
-- `specbuilder.Validator`는 `specbuilder.Candidate`(`Draft + Presets`) 검증만 수행하며, default 병합이나 finalized output 생성을 담당하지 않는다.
-- `FinalizeSessionSpec`은 검증된 candidate를 받아 preset data와 user parameters를 적용하고 immutable `spec.Spec`을 반환한다.
-- 제출된 `draft.Draft`의 `preset_refs`는 nullable이다. Preset-backed spec building은 선택된 preset data를 읽고, provenance를 위해 해당 ref들을 `spec.Spec`에도 유지한다.
-- Submit/API layer가 제출 모드에 맞는 builder를 선택한다. Raw/custom 제출은 `specbuilder.PresetBacked` 내부 분기가 아니라 별도 builder를 사용해야 한다.
-
-**Idempotency in the core**
-- 같은 `idempotency_key` + 같은 normalized spec → 기존 session 반환
-- 같은 `idempotency_key` + 다른 spec → 409 Conflict
-- 동시 제출 race를 막기 위해 DB에서 `UNIQUE(project_id, idempotency_key)`를 강제한다
-
-### Logs API
-
-WebSocket은 사용하지 않는다. 에이전트의 polling과 재시도를 단순하게 하기 위해 cursor 기반 tail 방식을 사용한다:
-
-```
-GET /v1/sessions/{id}/logs?stream=stdout&cursor=1234&limit=200
-```
-
-Response:
-```json
-{
-  "status": 200,
-  "data": {
-    "next_cursor": 1456,
-    "lines": ["...", "..."]
-  }
-}
-```
-
-## 7. Artifact Contract
-
-종료된 session은 성공 여부와 관계없이 다음 파일들을 artifact 디렉터리에 반드시 기록해야 한다:
-
-```
-/artifacts/{project_id}/{session_id}/
-  spec.yaml              # 원본 제출 spec
-  resolved_config.yaml   # trainer가 YAML을 요구하는 경우 spec.TrainingOptions를 runtime에서 materialize한 view
-  stdout.log
-  stderr.log
-  metrics.json           # 구조화된 학습 지표
-  report.md              # 사람이 읽을 수 있는 요약
-  adapter/               # LoRA adapter weights (요청된 경우)
-  merged/                # 선택적으로 병합된 full weights
-```
-
-**규칙:** `spec.yaml`과 finalized training options artifact가 없으면 해당 session은 불완전한 것으로 간주한다. Trainer 호환성을 위해 artifact 이름이 `resolved_config.yaml`일 수는 있지만, manager 내부의 source of truth는 YAML이 아니다.
-
-플랫폼은 생성된 파일을 `ArtifactIndex`로 추적한다. `ArtifactIndex`는 base path와 상대 path, 크기, checksum metadata를 가진 file entry 목록으로 구성된다. 실제 파일 내용의 source of truth는 파일시스템이다.
-
-### 7.1 metrics.json Minimum Schema
-
-모든 preset은 최소한 아래 필드를 포함하는 `metrics.json`을 생성해야 한다. preset별 추가 필드는 허용되지만, 아래 key와 충돌해서는 안 된다.
-
-```json
-{
-  "train": {
-    "global_step": 1234,
-    "final_loss": 1.2345,
-    "runtime_sec": 3600,
-    "samples_per_sec": 12.5
-  },
-  "eval": {
-    "final_loss": 1.3456
-  },
-  "system": {
-    "max_gpu_mem_mb": 23000,
-    "gpu_name": "NVIDIA GeForce RTX 3090"
-  },
-  "outcome": {
-    "result": "success",
-    "epochs_completed": 3
-  }
-}
-```
-
-| 필드 | 필수 | 설명 |
-|-------|----------|-------------|
-| `train.global_step` | yes | 완료된 총 optimizer step 수 |
-| `train.final_loss` | yes | 마지막으로 기록된 training loss |
-| `train.runtime_sec` | yes | 실제 벽시계 기준 학습 시간(초) |
-| `train.samples_per_sec` | no | capacity planning용 처리량 |
-| `eval.final_loss` | no | eval dataset이 제공된 경우 존재 |
-| `eval.runtime_sec` | no | 실제 벽시계 기준 eval 시간 |
-| `eval.dataset_name` | no | eval에 사용한 split 또는 dataset |
-| `system.max_gpu_mem_mb` | yes | 학습 중 관측된 최대 VRAM 사용량 |
-| `system.gpu_name` | no | 재현성 메모를 위한 GPU 모델 |
-| `outcome.result` | yes | `success` 또는 `failure` |
-| `outcome.epochs_completed` | yes | 실제로 완료된 epoch 수 |
-
-`eval`은 optional이지만, 존재한다면 동일한 shape를 따라야 한다. 이렇게 해야 eval을 사용한 session과 사용하지 않은 session을 schema drift 없이 비교할 수 있다.
-
-## 8. TrainerPreset Contract
-
-Preset은 YAML 파일이 아니라 structured data다. Preset ref는 category-based 구조를 사용하여 trainer, resource, output defaults/policies를 독립적으로 조합할 수 있게 한다. `TrainerPreset`은 stable preset ID, trainer runtime, 기본 training value, 그리고 어떤 user parameter를 허용할지 정의하는 `OptionPolicy`를 가진다.
-
-개념적인 Go shape:
-
-```go
-type ID = uuid.UUID
-
-var (
-    PresetAxolotlLoRASFT ID = uuid.MustParse("16f6f42a-597b-4c37-9b8e-7f3908fbfa73")
-    PresetUnslothLoRASFT ID = uuid.MustParse("258e5d45-c4e1-40a4-9f88-8fbb0b7f7c75")
-)
-
-type Preset interface {
-    PresetID() ID
-    Options() preset.Options
-}
-
-type TrainerPreset struct {
-    ID            ID
-    DisplayName   string
-    Runtime       RuntimeSpec
-    DefaultValues map[string]any
-    Policy        OptionPolicy
-}
-
-type RuntimeSpec struct {
-    Image      string
-    Entrypoint []string
-    Env        map[string]string
-}
-
-type OptionPolicy struct {
-    Rules map[string]OptionRule
-}
-
-type OptionRule struct {
-    Type OptionValueType
-    Min  *float64
-    Max  *float64
-}
-
-type OptionValueType string
-
-const (
-    OptionString OptionValueType = "string"
-    OptionInt    OptionValueType = "int"
-    OptionFloat  OptionValueType = "float"
-    OptionBool   OptionValueType = "bool"
-)
-```
-
-`OptionPolicy.Rules`에 없는 parameter key를 제출하면 validation error를 반환한다. 값의 type이 틀리거나 설정된 numeric range를 벗어나도 validation error를 반환한다.
-
-`OptionValueType`은 validator가 사용하는 작은 typed string enum이다. 이 타입 자체가 값을 자동으로 검증하지는 않으며, validation code가 rule type으로 switch하여 제출된 `any` 값을 검사한다. `Enum`/allowed-values 제약은 Phase 0에서 제외하며, 실제 preset이 필요로 하는 시점에 추가한다.
-
-Phase 0 preset은 Go fixture 또는 DB seed data로 제공한다. Manager는 YAML preset file을 source of truth로 취급하지 않는다.
-
-### 8.1 Preset Execution Contract
-
-Preset은 단순한 Docker image가 아니다. 이는 플랫폼과 trainer container 사이의 **behavioral contract**다.
-
-**플랫폼이 보장하는 입력**
-1. finalized training options를 preset이 정의한 경로에 mount한다. Trainer가 YAML을 기대하는 경우 `resolved_config.yaml`로 materialize할 수 있지만, manager는 structured `spec.TrainingOptions`를 소유한다.
-2. 모든 `datasets`는 `/workspace/data/` 아래에 mount 또는 symlink된다.
-3. base model은 `/workspace/model/`에서 접근 가능해야 한다(또는 container 내부에서 HF Hub를 사용할 경우 `HF_HOME` 캐시를 통해 접근 가능).
-4. 출력 디렉터리 `/workspace/output/`은 쓰기 가능해야 하며, 그 내용은 플랫폼이 색인하는 artifact set이 된다.
-
-**Container가 생성해야 하는 출력**
-1. `/workspace/output/spec.yaml` — 제출된 spec의 복사본
-2. `/workspace/output/resolved_config.yaml` — YAML을 사용하는 경우 finalized training options를 runtime-compatible하게 materialize한 결과
-3. `/workspace/output/stdout.log` 및 `/workspace/output/stderr.log`
-4. `/workspace/output/metrics.json` — Section 7.1의 minimum schema를 만족해야 함
-5. `/workspace/output/report.md` — 사람이 읽을 수 있는 요약(학습 시간, 최종 loss, 사용한 하드웨어)
-6. `/workspace/output/adapter/` — resolved preset/output policy에서 adapter output을 요청한 경우
-7. `/workspace/output/merged/` — resolved preset/output policy에서 merged model output을 요청한 경우
-
-필수 출력 중 하나라도 누락되면 session은 `status=terminated`,
-`result=failure`, `failure_reason=trainer_error`로 기록되며 플랫폼은 존재하는
-partial output을 최대한 수집한다.
-
-## 9. Storage Driver
-
-MVP는 로컬 파일시스템만 사용한다. artifact store는 좁은 driver interface 뒤에 배치하여, 나중에 `s3://` 또는 `minio://`를 Session 로직 변경 없이 추가할 수 있게 한다.
-
-```go
-type StorageDriver interface {
-    Write(sessionID, path string, r io.Reader) error
-    Read(sessionID, path string) (io.ReadCloser, error)
-    List(sessionID string) (ArtifactIndex, error)
-}
-```
-
-## 10. IDs
-
-초기 Go 도메인 모델에서 Project, Spec, Session ID는 UUID를 사용한다:
-
-```
-4e78df8a-bdb7-41e8-92d7-a1a9f26fd90c
-```
-
-UUID는 안정적이고 널리 지원되며 현재 코드베이스에서도 이미 사용 중이다. 에이전트가 복사하기 어렵다는 문제가 실제로 커지면, 저장 ID를 바꾸기 전에 CLI/search alias 또는 wrapper type을 추가한다.
-
-## 11. Database (SQLite)
-
-MVP는 SQLite에 session 상태를 영속화한다.
-
-최소 schema:
-
-```sql
-CREATE TABLE projects (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    description TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE specs (
-    id TEXT PRIMARY KEY,
-    project_id TEXT NOT NULL REFERENCES projects(id),
-    type TEXT NOT NULL DEFAULT 'batch',
-    name TEXT NOT NULL,
-    description TEXT,
-    model_options TEXT NOT NULL,    -- JSON
-    data_options TEXT NOT NULL,     -- JSON
-    resource_options TEXT NOT NULL, -- JSON
-    training_options TEXT,          -- JSON
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE preset_categories (
-    id TEXT PRIMARY KEY,
-    description TEXT NOT NULL DEFAULT ''
-);
-
-CREATE TABLE presets (
-    id TEXT PRIMARY KEY,
-    category TEXT NOT NULL REFERENCES preset_categories(id),
-    display_name TEXT NOT NULL,
-    enabled INTEGER NOT NULL DEFAULT 1,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE trainer_presets (
-    preset_id TEXT PRIMARY KEY REFERENCES presets(id) ON DELETE CASCADE,
-    image TEXT NOT NULL,
-    entrypoint TEXT NOT NULL,
-    env TEXT NOT NULL DEFAULT '{}'
-);
-
-CREATE TABLE preset_option_rules (
-    preset_id TEXT NOT NULL REFERENCES presets(id) ON DELETE CASCADE,
-    key TEXT NOT NULL,
-    value_type TEXT NOT NULL,
-    min_value REAL,
-    max_value REAL,
-    PRIMARY KEY(preset_id, key)
-);
-
-CREATE TABLE preset_default_values (
-    preset_id TEXT NOT NULL REFERENCES presets(id) ON DELETE CASCADE,
-    key TEXT NOT NULL,
-    value_json TEXT NOT NULL,
-    PRIMARY KEY(preset_id, key)
-);
-
--- Phase 0는 `trainer`, `resource`, `output` category와
--- Phase 0 Axolotl, Unsloth trainer preset row를 seed한다.
-
-CREATE TABLE spec_preset_refs (
-    spec_id TEXT NOT NULL REFERENCES specs(id) ON DELETE CASCADE,
-    category TEXT NOT NULL REFERENCES preset_categories(id),
-    preset_id TEXT NOT NULL REFERENCES presets(id),
-    PRIMARY KEY(spec_id, category)
-);
-
-CREATE TABLE sessions (
-    id TEXT PRIMARY KEY,
-    project_id TEXT NOT NULL REFERENCES projects(id),
-    spec_id TEXT NOT NULL REFERENCES specs(id),
-    type TEXT NOT NULL DEFAULT 'batch',
-    status TEXT NOT NULL,
-    result TEXT NOT NULL DEFAULT 'undefined',
-    failure_reason TEXT,
-    artifact_path TEXT,
-    assigned_agent_id TEXT,
-    assigned_gpu_index INTEGER,
-    kernel_id TEXT,
-    idempotency_key TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    started_at DATETIME,
-    finished_at DATETIME,
-    UNIQUE(project_id, idempotency_key),
-    CHECK(assigned_gpu_index IS NULL OR assigned_gpu_index IN (0, 1))
-);
-
-CREATE UNIQUE INDEX active_gpu_assignments
-ON sessions(assigned_agent_id, assigned_gpu_index)
-WHERE status IN ('preparing', 'running')
-  AND assigned_agent_id IS NOT NULL
-  AND assigned_gpu_index IS NOT NULL;
-
-CREATE TABLE artifacts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    session_id TEXT NOT NULL REFERENCES sessions(id),
-    path TEXT NOT NULL,
-    type TEXT,
-    size_bytes INTEGER,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-```
-
-초기 반복 단계에서는 JSON 컬럼으로 schema를 안정적으로 유지한다. 특정 필드에 indexing 또는 더 엄격한 제약이 필요해질 때만 typed column을 추가한다.
-
-### 11.1 Scheduler Rules
-
-MVP 스케줄링은 하드웨어 구성이 고정되어 있으므로 의도적으로 단순하게 유지한다(단일 노드, 2× RTX 3090).
-
-- **Policy**: GPU별 FIFO. preemption 없음, bin-packing 없음, priority queue 없음
-- **Concurrency**: GPU당 session 1개. 동시에 GPU가 할당된 session은 최대 2개
-- **GPU selection**: 비어 있는 첫 번째 GPU(0 또는 1)를 할당. 둘 다 비어 있으면 GPU 0 우선
-- **Resource claim**: `SessionProvisioner`는 session을 `pending`에서 `preparing`으로 옮길 때 `assigned_agent_id`와 `assigned_gpu_index`를 기록한다
-- **Active capacity**: session은 `preparing` 또는 `running` 상태인 동안 정확히 GPU 1개를 예약한다. Terminal session은 audit을 위해 assignment field를 유지할 수 있지만 active capacity에는 포함하지 않는다
-- **Kernel reference**: `KernelLauncher.Prepare`가 성공하면 `kernel_id`를 기록하여 이후 `Start`, `Cleanup`, observation call이 같은 agent-side kernel로 route될 수 있게 한다
-- **Queue behavior**: 두 GPU가 모두 바쁘면 새 session은 GPU가 비워질 때까지 `pending`에 머묾
-- **Re-queue**: `result=failure`인 session은 자동 재시도하지 않음. 에이전트가 새 session을 다시 제출해야 함
-- **Recovery**: coordinator는 missed wake-up을 복구하기 위해 periodic reconcile loop를 사용할 수 있다. MVP에는 Valkey/Redis나 distributed lock service가 필요하지 않다
-
-이렇게 하면 분산 스케줄러의 복잡성 없이도 동작을 예측 가능하고 관측 가능하게 유지할 수 있다.
-
-## 12. Non-Goals (MVP)
-
-다음 항목은 첫 번째 milestone의 명시적 범위 밖이다:
-
-- Multi-tenant quota / policy enforcement
-- 분산 학습
-- Kubernetes native integration
-- 실시간 서빙 orchestration
-- Web UI / dashboard
-- 고급 스케줄링 또는 bin-packing
-- Webhook / notification system
-- W&B SaaS integration (추후 선택적 추가 가능)
-
-## 13. MergeOwl Phase 0 TrainerPresets
-
-초기 시작에 필요한 trainer preset은 두 개뿐이다:
-
-1. `16f6f42a-597b-4c37-9b8e-7f3908fbfa73`
-2. `258e5d45-c4e1-40a4-9f88-8fbb0b7f7c75`
-
-두 trainer preset 모두 LoRA adapter를 생성한다. merged model export는 optional이다. 이들은 structured fixture 또는 DB seed data를 통해 등록하고, display name이 아니라 `preset.ID`로 조회한다.
-
-## 14. Agent UX Principles
-
-- 연구자 에이전트는 Docker flag가 아니라 **가설과 변수** 관점에서 사고해야 한다
-- TrainerPreset은 trainer contract를 인코딩하고, resource/output preset은 다른 category를 인코딩할 수 있으며, parameter는 실험을 인코딩한다
-- 과거 실험을 다시 실행하는 일은 draft 또는 finalized spec 한 번 복사-붙여넣기로 끝나야 한다
-- 실패한 session도 box에 SSH로 들어가지 않고 inspect 가능해야 한다
+- Experiment lifecycle
+- AgentTask와 완료 조건
+- training/evaluation comparison loop
+- lineage와 model promotion
+- agent가 관찰 결과를 바탕으로 다음 session을 계획하는 흐름
+
+### 이후 확장
+
+- inference session과 model serving
+- multi-node 또는 multi-GPU session
+- resource group과 richer scheduling policy
+- remote artifact storage
+- multi-tenant quota와 policy
+
+## 11. MVP에서 하지 않는 것
+
+- 범용 workflow engine
+- 분산 scheduler framework
+- Kubernetes-native orchestration
+- multi-tenant quota 및 billing
+- 복잡한 priority와 bin-packing
+- 실시간 dashboard
+- 외부 experiment tracking SaaS에 대한 필수 의존
+
+이 항목들은 영구적인 non-goal이 아니라 Phase 0에서 핵심 경계를 검증하는 데
+필요하지 않은 기능이다.
+
+## 12. 성공 기준
+
+Phase 0은 다음 질문에 모두 “예”라고 답할 수 있을 때 성공한 것으로 본다.
+
+- Agent가 Docker 세부사항 없이 training session을 제출할 수 있는가?
+- 잘못된 입력이 GPU를 점유하기 전에 검증되는가?
+- session 상태와 실패 원인을 API만으로 이해할 수 있는가?
+- 모든 terminal session에서 재현에 필요한 입력과 artifact를 찾을 수 있는가?
+- Scheduler가 동시에 두 GPU를 안전하게 할당하고 회수할 수 있는가?
+- Docker 이외의 runtime이나 training 이외의 session type을 추가해도 핵심 domain을
+  다시 정의할 필요가 없는가?
+
+구체적인 타입과 패키지 배치는 코드와 `docs/design/` 문서를 source of truth로
+삼는다. 이 문서는 제품과 아키텍처가 향해야 할 방향을 정의한다.

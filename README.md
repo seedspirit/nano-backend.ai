@@ -7,7 +7,7 @@ notebooks, submitted code, training, evaluation, and inference sessions. Phase
 0 is intentionally narrower: it targets a single machine with 2x RTX 3090 GPUs
 and executes one-GPU LoRA fine-tuning sessions from validated presets.
 
-See [`SPEC.md`](SPEC.md) for the full MVP contract.
+See [`SPEC.md`](SPEC.md) for the product and architecture direction.
 
 ## Agent Guidance
 
