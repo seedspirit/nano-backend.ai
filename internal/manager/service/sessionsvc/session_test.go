@@ -29,14 +29,16 @@ type stubRunRepo struct {
 	projectExistsErr error
 	createRunErr     error
 	created          bool
+	spec             *spec.Spec
 }
 
 func (r *stubRunRepo) ProjectExists(ctx context.Context, projectID uuid.UUID) error {
 	return r.projectExistsErr
 }
 
-func (r *stubRunRepo) CreateSession(ctx context.Context, s *spec.Spec, sessionRecord *session.Session) error {
+func (r *stubRunRepo) CreateSession(ctx context.Context, target *session.Session) error {
 	r.created = true
+	r.spec = &target.Definition
 	return r.createRunErr
 }
 
@@ -60,8 +62,8 @@ func TestSubmitReturnsPendingSessionOnSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("submit: %v", err)
 	}
-	if got.SpecID == specID {
-		t.Fatalf("got spec id %s; want a freshly assigned UUID different from stub processor's %s", got.SpecID, specID)
+	if repo.spec == nil || repo.spec.ID != got.ID || got.ID != specID {
+		t.Fatalf("persisted definition id = %v; want session and builder id %s", repo.spec, specID)
 	}
 	if got.Lifecycle.Status != session.Pending {
 		t.Fatalf("got status %s, want pending", got.Lifecycle.Status)

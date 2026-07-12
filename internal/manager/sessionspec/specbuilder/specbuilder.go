@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/seedspirit/nano-backend.ai/internal/common/data/session"
 	"github.com/seedspirit/nano-backend.ai/internal/common/data/session/draft"
 	"github.com/seedspirit/nano-backend.ai/internal/common/data/session/preset"
 	"github.com/seedspirit/nano-backend.ai/internal/common/data/session/spec"
@@ -67,7 +68,7 @@ func (b PresetBacked) readPresets(ctx context.Context, sessionDraft *draft.Draft
 }
 
 // TODO: Read preset data from database and cache it in memory for efficient lookup
-func (b PresetBacked) readPreset(ctx context.Context, refs preset.Refs) (map[preset.ID]preset.Preset, error) {
+func (b PresetBacked) readPreset(ctx context.Context, refs session.PresetRefs) (map[preset.ID]preset.Preset, error) {
 	ids := collectPresetIDs(refs)
 	if len(ids) == 0 {
 		return map[preset.ID]preset.Preset{}, nil
@@ -75,7 +76,7 @@ func (b PresetBacked) readPreset(ctx context.Context, refs preset.Refs) (map[pre
 	return b.Registry.GetMany(ctx, ids)
 }
 
-func collectPresetIDs(refs preset.Refs) []preset.ID {
+func collectPresetIDs(refs session.PresetRefs) []preset.ID {
 	candidates := []*preset.ID{refs.Trainer, refs.Resource, refs.Output}
 	ids := make([]preset.ID, 0, len(candidates))
 	seen := make(map[preset.ID]struct{}, len(candidates))

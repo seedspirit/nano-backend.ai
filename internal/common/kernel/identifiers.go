@@ -6,17 +6,16 @@ import (
 	"github.com/seedspirit/nano-backend.ai/internal/common/errordef"
 )
 
-// Identifiers references the Session, Project, and Spec a kernel belongs to.
+// Identifiers references the Session and Project a kernel belongs to.
 type Identifiers struct {
 	SessionID uuid.UUID `json:"session_id"`
 	ProjectID uuid.UUID `json:"project_id"`
-	SpecID    uuid.UUID `json:"spec_id"`
 }
 
-// NewIdentifiers constructs Identifiers, requiring all IDs to be non-nil.
-func NewIdentifiers(sessionID, projectID, specID uuid.UUID) (Identifiers, error) {
-	if sessionID == uuid.Nil || projectID == uuid.Nil || specID == uuid.Nil {
-		return Identifiers{}, errordef.Errorf(errordef.InvalidInput, "identifiers require non-nil session, project, and spec IDs")
+// NewIdentifiers constructs Identifiers, requiring both IDs to be non-nil.
+func NewIdentifiers(sessionID, projectID uuid.UUID) (Identifiers, error) {
+	if sessionID == uuid.Nil || projectID == uuid.Nil {
+		return Identifiers{}, errordef.Errorf(errordef.InvalidInput, "identifiers require non-nil session and project IDs")
 	}
-	return Identifiers{SessionID: sessionID, ProjectID: projectID, SpecID: specID}, nil
+	return Identifiers{SessionID: sessionID, ProjectID: projectID}, nil
 }

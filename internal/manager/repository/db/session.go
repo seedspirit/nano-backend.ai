@@ -44,14 +44,11 @@ func (r *SessionRepository) Close() error {
 func (r *SessionRepository) GetSpec(ctx context.Context, sessionID uuid.UUID) (spec.Spec, error) {
 	var row entity.Spec
 	err := r.db.GetContext(ctx, &row, `
-		SELECT specs.id, specs.project_id, specs.type, specs.name, specs.description,
-			specs.model_base_model,
-			specs.resource_cpu_cores, specs.resource_gpu_count,
-			specs.resource_memory_limit_bytes, specs.resource_timeout_duration_seconds,
-			specs.created_at
+		SELECT id, project_id, type, name, description, model_base_model,
+			resource_cpu_cores, resource_gpu_count, resource_memory_limit_bytes,
+			resource_timeout_duration_seconds, created_at
 		FROM sessions
-		JOIN specs ON specs.id = sessions.spec_id
-		WHERE sessions.id = ?
+		WHERE id = ?
 	`, sessionID.String())
 	if errors.Is(err, sql.ErrNoRows) {
 		return spec.Spec{}, errordef.ErrNotFound
@@ -101,7 +98,7 @@ func (r *SessionRepository) ListProjectSessions(ctx context.Context, projectID u
 
 	var rows []entity.Session
 	if err := r.db.SelectContext(ctx, &rows, `
-		SELECT id, project_id, spec_id, type, idempotency_key, status, result, failure_reason,
+		SELECT id, project_id, type, idempotency_key, status, result, failure_reason,
 			created_at, started_at, finished_at
 		FROM sessions
 		WHERE project_id = ?
@@ -136,10 +133,13 @@ func (r *SessionRepository) ProjectExists(ctx context.Context, projectID uuid.UU
 }
 
 // CreateSession persists a spec and a pending session in a single transaction.
-func (r *SessionRepository) CreateSession(ctx context.Context, sessionSpec *spec.Spec, sessionRecord *session.Session) error {
-	createdAt := encoding.FormatTime(sessionRecord.Lifecycle.CreatedAt)
+func (r *SessionRepository) CreateSession(ctx context.Context, target *session.Session) error {
+	if target == nil {
+		return fmt.Errorf("session is required")
+	}
+	createdAt := encoding.FormatTime(target.Lifecycle.CreatedAt)
 
-	specEntity, err := entity.FromData(sessionSpec, createdAt)
+	specEntity, err := entity.FromData(&target.Definition, createdAt)
 	if err != nil {
 		return fmt.Errorf("convert spec: %w", err)
 	}
@@ -150,10 +150,7 @@ func (r *SessionRepository) CreateSession(ctx context.Context, sessionSpec *spec
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if err := insertSpec(ctx, tx, &specEntity); err != nil {
-		return err
-	}
-	if err := insertSession(ctx, tx, sessionRecord, createdAt); err != nil {
+	if err := insertSession(ctx, tx, &specEntity, target, createdAt); err != nil {
 		return err
 	}
 
@@ -163,36 +160,33 @@ func (r *SessionRepository) CreateSession(ctx context.Context, sessionSpec *spec
 	return nil
 }
 
-func insertSpec(ctx context.Context, tx *sqlx.Tx, e *entity.Spec) error {
+func insertSession(ctx context.Context, tx *sqlx.Tx, e *entity.Spec, r *session.Session, createdAt string) error {
 	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO specs (
-			id, project_id, type, name, description,
-			model_base_model,
-			resource_cpu_cores, resource_gpu_count,
-			resource_memory_limit_bytes, resource_timeout_duration_seconds,
-			created_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, e.ID, e.ProjectID, e.Type, e.Name, e.Description,
-		e.ModelBaseModel,
-		e.ResourceCPUCores, e.ResourceGPUCount,
+		INSERT INTO sessions (
+			id, project_id, type, name, description, model_base_model,
+			resource_cpu_cores, resource_gpu_count, resource_memory_limit_bytes,
+			resource_timeout_duration_seconds, idempotency_key, status, created_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, r.ID.String(), r.ProjectID.String(), string(r.Type), e.Name, e.Description,
+		e.ModelBaseModel, e.ResourceCPUCores, e.ResourceGPUCount,
 		e.ResourceMemoryLimitBytes, e.ResourceTimeoutDurationSeconds,
-		e.CreatedAt); err != nil {
-		return fmt.Errorf("insert spec %s: %w", e.ID, err)
+		r.IdempotencyKey, string(r.Lifecycle.Status), createdAt); err != nil {
+		return fmt.Errorf("insert session %s: %w", r.ID, err)
 	}
 	for _, ds := range e.Datasets {
 		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO spec_datasets (spec_id, ordinal, dataset_ref, split_name)
+			INSERT INTO session_datasets (session_id, ordinal, dataset_ref, split_name)
 			VALUES (?, ?, ?, ?)
-		`, e.ID, ds.Ordinal, ds.DatasetRef, ds.SplitName); err != nil {
-			return fmt.Errorf("insert spec dataset %s/%d: %w", e.ID, ds.Ordinal, err)
+		`, r.ID.String(), ds.Ordinal, ds.DatasetRef, ds.SplitName); err != nil {
+			return fmt.Errorf("insert session dataset %s/%d: %w", r.ID, ds.Ordinal, err)
 		}
 	}
 	for _, p := range e.TrainingParameters {
 		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO spec_training_parameters (spec_id, key, value)
+			INSERT INTO session_training_parameters (session_id, key, value)
 			VALUES (?, ?, ?)
-		`, e.ID, p.Key, p.Value); err != nil {
-			return fmt.Errorf("insert spec parameter %s/%s: %w", e.ID, p.Key, err)
+		`, r.ID.String(), p.Key, p.Value); err != nil {
+			return fmt.Errorf("insert session parameter %s/%s: %w", r.ID, p.Key, err)
 		}
 	}
 	for _, ref := range []struct {
@@ -207,23 +201,11 @@ func insertSpec(ctx context.Context, tx *sqlx.Tx, e *entity.Spec) error {
 			continue
 		}
 		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO spec_preset_refs (spec_id, category, preset_id)
+			INSERT INTO session_preset_refs (session_id, category, preset_id)
 			VALUES (?, ?, ?)
-		`, e.ID, ref.category, ref.id.String()); err != nil {
-			return fmt.Errorf("insert spec preset ref %s/%s: %w", e.ID, ref.category, err)
+		`, r.ID.String(), ref.category, ref.id.String()); err != nil {
+			return fmt.Errorf("insert session preset ref %s/%s: %w", r.ID, ref.category, err)
 		}
-	}
-	return nil
-}
-
-func insertSession(ctx context.Context, tx *sqlx.Tx, r *session.Session, createdAt string) error {
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO sessions (
-			id, project_id, spec_id, type, status, created_at
-		) VALUES (?, ?, ?, ?, ?, ?)
-	`, r.ID.String(), r.ProjectID.String(), r.SpecID.String(),
-		string(r.Type), string(r.Lifecycle.Status), createdAt); err != nil {
-		return fmt.Errorf("insert session %s: %w", r.ID, err)
 	}
 	return nil
 }
@@ -232,8 +214,8 @@ func (r *SessionRepository) getSpecDatasets(ctx context.Context, specID uuid.UUI
 	var rows []entity.SpecDataset
 	if err := r.db.SelectContext(ctx, &rows, `
 		SELECT ordinal, dataset_ref, split_name
-		FROM spec_datasets
-		WHERE spec_id = ?
+		FROM session_datasets
+		WHERE session_id = ?
 		ORDER BY ordinal
 	`, specID.String()); err != nil {
 		return nil, fmt.Errorf("get spec datasets %s: %w", specID, err)
@@ -245,32 +227,32 @@ func (r *SessionRepository) getSpecTrainingParameters(ctx context.Context, specI
 	var rows []entity.SpecTrainingParameter
 	if err := r.db.SelectContext(ctx, &rows, `
 		SELECT key, value
-		FROM spec_training_parameters
-		WHERE spec_id = ?
+		FROM session_training_parameters
+		WHERE session_id = ?
 	`, specID.String()); err != nil {
 		return nil, fmt.Errorf("get spec training parameters %s: %w", specID, err)
 	}
 	return rows, nil
 }
 
-func (r *SessionRepository) getSpecPresetRefs(ctx context.Context, specID uuid.UUID) (preset.Refs, error) {
+func (r *SessionRepository) getSpecPresetRefs(ctx context.Context, specID uuid.UUID) (session.PresetRefs, error) {
 	var rows []struct {
 		Category string `db:"category"`
 		PresetID string `db:"preset_id"`
 	}
 	if err := r.db.SelectContext(ctx, &rows, `
 		SELECT category, preset_id
-		FROM spec_preset_refs
-		WHERE spec_id = ?
+		FROM session_preset_refs
+		WHERE session_id = ?
 	`, specID.String()); err != nil {
-		return preset.Refs{}, fmt.Errorf("get spec preset refs %s: %w", specID, err)
+		return session.PresetRefs{}, fmt.Errorf("get spec preset refs %s: %w", specID, err)
 	}
 
-	var refs preset.Refs
+	var refs session.PresetRefs
 	for _, row := range rows {
 		id, err := uuid.Parse(row.PresetID)
 		if err != nil {
-			return preset.Refs{}, fmt.Errorf("parse preset id %q: %w", row.PresetID, err)
+			return session.PresetRefs{}, fmt.Errorf("parse preset id %q: %w", row.PresetID, err)
 		}
 		switch preset.Category(row.Category) {
 		case preset.TrainerPreset:
@@ -280,7 +262,7 @@ func (r *SessionRepository) getSpecPresetRefs(ctx context.Context, specID uuid.U
 		case preset.OutputPreset:
 			refs.Output = &id
 		default:
-			return preset.Refs{}, fmt.Errorf("unknown preset category %q", row.Category)
+			return session.PresetRefs{}, fmt.Errorf("unknown preset category %q", row.Category)
 		}
 	}
 	return refs, nil

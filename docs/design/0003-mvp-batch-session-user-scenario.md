@@ -97,10 +97,10 @@ Project 준비
 
 ## 5. 플랫폼이 pending Session을 안전하게 기록한다
 
-Session 제출이 성공하면 spec과 pending lifecycle이 하나의 transaction으로
-기록되어야 한다.
+Session 제출이 성공하면 finalized spec과 pending lifecycle이 하나의 Session
+record 및 그 하위 데이터로 같은 transaction 안에서 기록되어야 한다.
 
-- [x] Spec과 Session을 하나의 SQLite transaction으로 저장한다.
+- [x] Session이 finalized spec을 실행 시점 snapshot으로 직접 소유한다.
 - [x] Session은 `status=pending`으로 생성된다.
 - [x] Session은 `result=undefined`로 생성된다.
 - [x] Session type과 Project/Spec 관계를 저장한다.

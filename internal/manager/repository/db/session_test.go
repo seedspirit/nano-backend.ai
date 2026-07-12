@@ -9,7 +9,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/seedspirit/nano-backend.ai/internal/common/data/session"
-	"github.com/seedspirit/nano-backend.ai/internal/common/data/session/preset"
 	"github.com/seedspirit/nano-backend.ai/internal/common/data/session/spec"
 	"github.com/seedspirit/nano-backend.ai/internal/common/errordef"
 	sessionspecpreset "github.com/seedspirit/nano-backend.ai/internal/manager/sessionspec/preset"
@@ -40,16 +39,16 @@ func TestMigrateIsIdempotent(t *testing.T) {
 		SELECT COUNT(*)
 		FROM sqlite_master
 		WHERE type = 'table' AND name IN (
-			'projects', 'specs', 'spec_datasets', 'spec_training_parameters',
+			'projects', 'session_datasets', 'session_training_parameters',
 			'preset_categories', 'presets', 'trainer_presets',
-			'preset_option_rules', 'preset_default_values', 'spec_preset_refs',
+			'preset_option_rules', 'preset_default_values', 'session_preset_refs',
 			'sessions', 'artifacts'
 		)
 	`); err != nil {
 		t.Fatalf("terminated to inspect sqlite schema: %v", err)
 	}
-	if count != 12 {
-		t.Fatalf("got %d migrated tables, want 12", count)
+	if count != 11 {
+		t.Fatalf("got %d migrated tables, want 11", count)
 	}
 
 	var categoryCount int
@@ -72,18 +71,17 @@ func TestMigrateIsIdempotent(t *testing.T) {
 func TestGetSpecUsesSessionID(t *testing.T) {
 	fixture := newSessionRepositoryFixture(t)
 	projectID := fixture.givenProject()
-	specID := fixture.givenSpec(projectID, "mergeowl-exp-42")
-	sessionID := fixture.givenSessionForSpec(projectID, specID, testCreatedAt)
+	sessionID := fixture.givenSession(projectID, "mergeowl-exp-42", testCreatedAt)
 	trainerPresetID := sessionspecpreset.PresetAxolotlLoRASFT
 
-	fixture.givenTrainerPresetRef(specID, trainerPresetID)
+	fixture.givenTrainerPresetRef(sessionID, trainerPresetID)
 
 	got, err := fixture.repo.GetSpec(fixture.ctx, sessionID)
 	if err != nil {
 		t.Fatalf("get spec by session id: %v", err)
 	}
-	if got.ID != specID {
-		t.Fatalf("got spec id %s, want %s", got.ID, specID)
+	if got.ID != sessionID {
+		t.Fatalf("got spec id %s, want session id %s", got.ID, sessionID)
 	}
 	if got.Type != session.Batch {
 		t.Fatalf("got session type %q, want %q", got.Type, session.Batch)
@@ -127,22 +125,21 @@ func TestGetSpecUsesSessionID(t *testing.T) {
 		t.Fatalf("got training param int value %d, want 32", intValue)
 	}
 
-	_, err = fixture.repo.GetSpec(fixture.ctx, specID)
+	_, err = fixture.repo.GetSpec(fixture.ctx, uuid.New())
 	if !errors.Is(err, errordef.ErrNotFound) {
-		t.Fatalf("got err %v, want ErrNotFound when using spec id", err)
+		t.Fatalf("got err %v, want ErrNotFound for unknown session", err)
 	}
 }
 
 func TestGetSpecPreservesFloatTrainingParameter(t *testing.T) {
 	fixture := newSessionRepositoryFixture(t)
 	projectID := fixture.givenProject()
-	specID := fixture.givenSpec(projectID, "mergeowl-exp-float")
-	sessionID := fixture.givenSessionForSpec(projectID, specID, testCreatedAt)
+	sessionID := fixture.givenSession(projectID, "mergeowl-exp-float", testCreatedAt)
 
 	if _, err := fixture.repo.db.ExecContext(fixture.ctx, `
-		INSERT INTO spec_training_parameters (spec_id, key, value)
+		INSERT INTO session_training_parameters (session_id, key, value)
 		VALUES (?, ?, ?)
-	`, specID.String(), "learning_rate", "0.0002"); err != nil {
+	`, sessionID.String(), "learning_rate", "0.0002"); err != nil {
 		t.Fatalf("insert float training parameter: %v", err)
 	}
 
@@ -166,33 +163,33 @@ func TestGetSpecPreservesFloatTrainingParameter(t *testing.T) {
 	}
 }
 
-func TestSpecChildRowsCascadeOnDelete(t *testing.T) {
+func TestSessionChildRowsCascadeOnDelete(t *testing.T) {
 	fixture := newSessionRepositoryFixture(t)
 	projectID := fixture.givenProject()
-	specID := fixture.givenSpec(projectID, "mergeowl-exp-cascade")
+	sessionID := fixture.givenSession(projectID, "mergeowl-exp-cascade", testCreatedAt)
 
-	if _, err := fixture.repo.db.ExecContext(fixture.ctx, `DELETE FROM specs WHERE id = ?`, specID.String()); err != nil {
-		t.Fatalf("delete spec: %v", err)
+	if _, err := fixture.repo.db.ExecContext(fixture.ctx, `DELETE FROM sessions WHERE id = ?`, sessionID.String()); err != nil {
+		t.Fatalf("delete session: %v", err)
 	}
 
 	var datasetCount int
 	if err := fixture.repo.db.GetContext(fixture.ctx, &datasetCount, `
-		SELECT COUNT(*) FROM spec_datasets WHERE spec_id = ?
-	`, specID.String()); err != nil {
-		t.Fatalf("count spec_datasets: %v", err)
+		SELECT COUNT(*) FROM session_datasets WHERE session_id = ?
+	`, sessionID.String()); err != nil {
+		t.Fatalf("count session_datasets: %v", err)
 	}
 	if datasetCount != 0 {
-		t.Fatalf("got %d spec_datasets rows after CASCADE, want 0", datasetCount)
+		t.Fatalf("got %d session_datasets rows after CASCADE, want 0", datasetCount)
 	}
 
 	var parameterCount int
 	if err := fixture.repo.db.GetContext(fixture.ctx, &parameterCount, `
-		SELECT COUNT(*) FROM spec_training_parameters WHERE spec_id = ?
-	`, specID.String()); err != nil {
-		t.Fatalf("count spec_training_parameters: %v", err)
+		SELECT COUNT(*) FROM session_training_parameters WHERE session_id = ?
+	`, sessionID.String()); err != nil {
+		t.Fatalf("count session_training_parameters: %v", err)
 	}
 	if parameterCount != 0 {
-		t.Fatalf("got %d spec_training_parameters rows after CASCADE, want 0", parameterCount)
+		t.Fatalf("got %d session_training_parameters rows after CASCADE, want 0", parameterCount)
 	}
 }
 
@@ -291,64 +288,46 @@ func (f *sessionRepositoryFixture) givenProject() uuid.UUID {
 	return id
 }
 
-func (f *sessionRepositoryFixture) givenSpec(projectID uuid.UUID, name string) uuid.UUID {
+func (f *sessionRepositoryFixture) givenSession(projectID uuid.UUID, name, createdAt string) uuid.UUID {
 	f.t.Helper()
 	id := uuid.New()
 	if _, err := f.repo.db.ExecContext(f.ctx, `
-		INSERT INTO specs (
+		INSERT INTO sessions (
 			id, project_id, name, description,
 			model_base_model,
 			resource_cpu_cores, resource_gpu_count,
 			resource_memory_limit_bytes, resource_timeout_duration_seconds,
-			created_at
+			status, created_at
 		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`, id.String(), projectID.String(), name, "LoRA SFT experiment",
 		testBaseModel,
 		0, testGPUCount,
 		testMemoryLimitBytes, testTimeoutDurationSecs,
-		testCreatedAt); err != nil {
-		f.t.Fatalf("insert spec: %v", err)
-	}
-	if _, err := f.repo.db.ExecContext(f.ctx, `
-		INSERT INTO spec_datasets (spec_id, ordinal, dataset_ref, split_name)
-		VALUES (?, ?, ?, ?)
-	`, id.String(), 0, testDatasetRef, testSplitName); err != nil {
-		f.t.Fatalf("insert spec dataset: %v", err)
-	}
-	if _, err := f.repo.db.ExecContext(f.ctx, `
-		INSERT INTO spec_training_parameters (spec_id, key, value)
-		VALUES (?, ?, ?)
-	`, id.String(), testTrainingParamKey, testTrainingParamValue); err != nil {
-		f.t.Fatalf("insert spec training parameter: %v", err)
-	}
-	return id
-}
-
-func (f *sessionRepositoryFixture) givenSession(projectID uuid.UUID, name, createdAt string) uuid.UUID {
-	f.t.Helper()
-	specID := f.givenSpec(projectID, name)
-	return f.givenSessionForSpec(projectID, specID, createdAt)
-}
-
-func (f *sessionRepositoryFixture) givenSessionForSpec(projectID, specID uuid.UUID, createdAt string) uuid.UUID {
-	f.t.Helper()
-	id := uuid.New()
-	if _, err := f.repo.db.ExecContext(f.ctx, `
-		INSERT INTO sessions (id, project_id, spec_id, status, created_at)
-		VALUES (?, ?, ?, ?, ?)
-	`, id.String(), projectID.String(), specID.String(), "pending", createdAt); err != nil {
+		"pending", createdAt); err != nil {
 		f.t.Fatalf("insert session: %v", err)
 	}
+	if _, err := f.repo.db.ExecContext(f.ctx, `
+		INSERT INTO session_datasets (session_id, ordinal, dataset_ref, split_name)
+		VALUES (?, ?, ?, ?)
+	`, id.String(), 0, testDatasetRef, testSplitName); err != nil {
+		f.t.Fatalf("insert session dataset: %v", err)
+	}
+	if _, err := f.repo.db.ExecContext(f.ctx, `
+		INSERT INTO session_training_parameters (session_id, key, value)
+		VALUES (?, ?, ?)
+	`, id.String(), testTrainingParamKey, testTrainingParamValue); err != nil {
+		f.t.Fatalf("insert session training parameter: %v", err)
+	}
 	return id
 }
 
-func (f *sessionRepositoryFixture) givenTrainerPresetRef(specID, presetID uuid.UUID) {
+func (f *sessionRepositoryFixture) givenTrainerPresetRef(sessionID, presetID uuid.UUID) {
 	f.t.Helper()
 	if _, err := f.repo.db.ExecContext(f.ctx, `
-		INSERT INTO spec_preset_refs (spec_id, category, preset_id)
+		INSERT INTO session_preset_refs (session_id, category, preset_id)
 		VALUES (?, ?, ?)
-	`, specID.String(), "trainer", presetID.String()); err != nil {
+	`, sessionID.String(), "trainer", presetID.String()); err != nil {
 		f.t.Fatalf("insert preset ref: %v", err)
 	}
 }
@@ -357,13 +336,13 @@ func TestCreateSessionPersistsSpecAndSession(t *testing.T) {
 	fixture := newSessionRepositoryFixture(t)
 	projectID := fixture.givenProject()
 	specValue := sampleSpec(projectID)
-	sessionValue := session.NewWithSpec(specValue.ID, projectID, session.Batch)
+	target := session.NewPending(specValue)
 
-	if err := fixture.repo.CreateSession(fixture.ctx, &specValue, &sessionValue); err != nil {
+	if err := fixture.repo.CreateSession(fixture.ctx, &target); err != nil {
 		t.Fatalf("create session: %v", err)
 	}
 
-	gotSpec, err := fixture.repo.GetSpec(fixture.ctx, sessionValue.ID)
+	gotSpec, err := fixture.repo.GetSpec(fixture.ctx, target.ID)
 	if err != nil {
 		t.Fatalf("get spec by session id: %v", err)
 	}
@@ -379,9 +358,9 @@ func TestCreateSessionRollsBackOnProjectFKViolation(t *testing.T) {
 	fixture := newSessionRepositoryFixture(t)
 	missingProjectID := uuid.New()
 	specValue := sampleSpec(missingProjectID)
-	sessionValue := session.NewWithSpec(specValue.ID, missingProjectID, session.Batch)
+	target := session.NewPending(specValue)
 
-	err := fixture.repo.CreateSession(fixture.ctx, &specValue, &sessionValue)
+	err := fixture.repo.CreateSession(fixture.ctx, &target)
 	if err == nil {
 		t.Fatal("got nil error, want FK violation")
 	}
@@ -390,8 +369,7 @@ func TestCreateSessionRollsBackOnProjectFKViolation(t *testing.T) {
 		query string
 		arg   string
 	}{
-		{`SELECT COUNT(*) FROM specs WHERE id = ?`, specValue.ID.String()},
-		{`SELECT COUNT(*) FROM sessions WHERE id = ?`, sessionValue.ID.String()},
+		{`SELECT COUNT(*) FROM sessions WHERE id = ?`, target.ID.String()},
 	} {
 		var n int
 		if err := fixture.repo.db.GetContext(fixture.ctx, &n, kv.query, kv.arg); err != nil {
@@ -423,17 +401,17 @@ func sampleSpec(projectID uuid.UUID) spec.Spec {
 		ProjectID:    projectID,
 		Name:         "submission-1",
 		Description:  "",
-		PresetRefs:   preset.Refs{Trainer: &trainerID},
-		ModelOptions: spec.ModelOptions{BaseModel: "meta-llama/Llama-3-8B"},
-		DataOptions: spec.DataOptions{
-			Datasets: []spec.DatasetRef{{Path: "tatsu-lab/alpaca", Split: "train"}},
+		PresetRefs:   session.PresetRefs{Trainer: &trainerID},
+		ModelOptions: session.ModelOptions{BaseModel: "meta-llama/Llama-3-8B"},
+		DataOptions: session.DataOptions{
+			Datasets: []session.DatasetRef{{Path: "tatsu-lab/alpaca", Split: "train"}},
 		},
-		ResourceOptions: spec.ResourceOptions{
+		ResourceOptions: session.ResourceOptions{
 			GPU:     session.GPUOptions{Count: 1},
 			Memory:  session.MemoryOptions{LimitBytes: 1 << 30},
 			Timeout: session.TimeoutOptions{DurationSeconds: 3600},
 		},
-		TrainingOptions: spec.TrainingOptions{
+		TrainingOptions: session.TrainingOptions{
 			Parameters: map[string]any{
 				"learning_rate": 0.0002,
 				"num_epochs":    3,

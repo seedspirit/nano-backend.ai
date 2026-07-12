@@ -20,13 +20,6 @@ const (
 	OutputPreset Category = "output"
 )
 
-// Refs selects optional preset categories.
-type Refs struct {
-	Trainer  *ID `json:"trainer,omitempty"`
-	Resource *ID `json:"resource,omitempty"`
-	Output   *ID `json:"output,omitempty"`
-}
-
 // Options is the resolved option data contributed by a preset.
 type Options struct {
 	Model              *ModelOptions

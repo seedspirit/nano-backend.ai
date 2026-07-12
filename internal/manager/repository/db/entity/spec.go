@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/seedspirit/nano-backend.ai/internal/common/data/session"
-	"github.com/seedspirit/nano-backend.ai/internal/common/data/session/preset"
 	"github.com/seedspirit/nano-backend.ai/internal/common/data/session/spec"
 	"github.com/seedspirit/nano-backend.ai/internal/common/encoding"
 )
@@ -26,19 +25,19 @@ type Spec struct {
 	ResourceTimeoutDurationSeconds int64  `db:"resource_timeout_duration_seconds"`
 	CreatedAt                      string `db:"created_at"`
 
-	PresetRefs         preset.Refs
+	PresetRefs         session.PresetRefs
 	Datasets           []SpecDataset
 	TrainingParameters []SpecTrainingParameter
 }
 
-// SpecDataset is the database record shape for a spec_datasets row.
+// SpecDataset is the database record shape for a session_datasets row.
 type SpecDataset struct {
 	Ordinal    int    `db:"ordinal"`
 	DatasetRef string `db:"dataset_ref"`
 	SplitName  string `db:"split_name"`
 }
 
-// SpecTrainingParameter is the database record shape for a spec_training_parameters row.
+// SpecTrainingParameter is the database record shape for a session_training_parameters row.
 //
 // Value is a JSON number literal (e.g. "3", "0.0002"). The server keeps the
 // stored representation as a string so it does not commit to int vs float;
@@ -59,9 +58,9 @@ func (s *Spec) ToData() (spec.Spec, error) {
 		return spec.Spec{}, fmt.Errorf("parse project id %q: %w", s.ProjectID, err)
 	}
 
-	datasets := make([]spec.DatasetRef, 0, len(s.Datasets))
+	datasets := make([]session.DatasetRef, 0, len(s.Datasets))
 	for _, ds := range s.Datasets {
-		datasets = append(datasets, spec.DatasetRef{
+		datasets = append(datasets, session.DatasetRef{
 			Path:  ds.DatasetRef,
 			Split: ds.SplitName,
 		})
@@ -79,19 +78,19 @@ func (s *Spec) ToData() (spec.Spec, error) {
 		Name:        s.Name,
 		Description: s.Description,
 		PresetRefs:  s.PresetRefs,
-		ModelOptions: spec.ModelOptions{
+		ModelOptions: session.ModelOptions{
 			BaseModel: s.ModelBaseModel,
 		},
-		DataOptions: spec.DataOptions{
+		DataOptions: session.DataOptions{
 			Datasets: datasets,
 		},
-		ResourceOptions: spec.ResourceOptions{
+		ResourceOptions: session.ResourceOptions{
 			CPU:     session.CPUOptions{Cores: s.ResourceCPUCores},
 			GPU:     session.GPUOptions{Count: s.ResourceGPUCount},
 			Memory:  session.MemoryOptions{LimitBytes: s.ResourceMemoryLimitBytes},
 			Timeout: session.TimeoutOptions{DurationSeconds: s.ResourceTimeoutDurationSeconds},
 		},
-		TrainingOptions: spec.TrainingOptions{
+		TrainingOptions: session.TrainingOptions{
 			Parameters: parameters,
 		},
 	}, nil

@@ -2,38 +2,23 @@
 // shapes, and the artifact index produced by a completed Session.
 package session
 
-import (
-	"time"
+import "time"
 
-	"github.com/google/uuid"
-)
-
-// Session represents a single execution instance of a Spec.
-//
-// A Session owns its identity and lifecycle metadata (timestamps, status) and
-// references the Project + Spec it was created from. The same Spec may spawn
-// multiple Sessions (e.g., reproducibility retries), each distinguished by its
-// own id and optional client-provided idempotency key.
+// Session represents a single execution and owns its finalized definition.
 type Session struct {
-	ID             uuid.UUID `json:"id"`
-	ProjectID      uuid.UUID `json:"project_id"`
-	SpecID         uuid.UUID `json:"spec_id"`
-	Type           Type      `json:"type"`
+	Definition
 	IdempotencyKey *string   `json:"idempotency_key,omitempty"`
 	Lifecycle      Lifecycle `json:"lifecycle"`
 }
 
-// NewWithSpec creates a batch Session for the given project and spec in Pending status.
-func NewWithSpec(specID, projectID uuid.UUID, sessionType Type) Session {
-	if sessionType == "" {
-		sessionType = Batch
+// NewPending creates a Session from its finalized definition.
+func NewPending(definition Definition) Session { //nolint:gocritic // The Session intentionally owns an immutable definition copy.
+	if definition.Type == "" {
+		definition.Type = Batch
 	}
 	return Session{
-		ID:        uuid.New(),
-		ProjectID: projectID,
-		SpecID:    specID,
-		Type:      sessionType,
-		Lifecycle: NewLifecycle(time.Now()),
+		Definition: definition,
+		Lifecycle:  NewLifecycle(time.Now()),
 	}
 }
 

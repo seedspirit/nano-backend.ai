@@ -13,7 +13,6 @@ import (
 type Session struct {
 	ID             string         `db:"id"`
 	ProjectID      string         `db:"project_id"`
-	SpecID         string         `db:"spec_id"`
 	Type           string         `db:"type"`
 	IdempotencyKey sql.NullString `db:"idempotency_key"`
 	Status         string         `db:"status"`
@@ -33,10 +32,6 @@ func (r *Session) ToData() (session.Session, error) {
 	projectID, err := uuid.Parse(r.ProjectID)
 	if err != nil {
 		return session.Session{}, fmt.Errorf("parse project id %q: %w", r.ProjectID, err)
-	}
-	specID, err := uuid.Parse(r.SpecID)
-	if err != nil {
-		return session.Session{}, fmt.Errorf("parse spec id %q: %w", r.SpecID, err)
 	}
 	createdAt, err := encoding.ParseTime(r.CreatedAt)
 	if err != nil {
@@ -68,10 +63,11 @@ func (r *Session) ToData() (session.Session, error) {
 	}
 
 	result := session.Session{
-		ID:        id,
-		ProjectID: projectID,
-		SpecID:    specID,
-		Type:      session.Type(r.Type),
+		Definition: session.Definition{
+			ID:        id,
+			ProjectID: projectID,
+			Type:      session.Type(r.Type),
+		},
 		Lifecycle: lifecycle,
 	}
 	if r.IdempotencyKey.Valid {

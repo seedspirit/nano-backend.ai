@@ -152,8 +152,9 @@ preset defaults may not yet be applied.
 
 ### SessionSpec
 
-An immutable execution definition after validation and default resolution. The
-same SessionSpec should be reusable for reproduction.
+An immutable execution definition after validation and default resolution. It
+is owned by one Session and stored with that Session as the execution snapshot.
+Reproduction creates a new Session by copying the finalized definition.
 
 ### Preset
 
@@ -173,7 +174,7 @@ SessionSpecs rather than unrelated top-level execution objects.
 SessionSpecDraft
   → validation and preset resolution
   → immutable SessionSpec
-  → Session persistence
+  → Session persistence with its execution definition
   → scheduling and resource allocation
   → kernel.CreationSpec
   → Agent runtime
